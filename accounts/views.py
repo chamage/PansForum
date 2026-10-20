@@ -16,7 +16,8 @@ from django.utils import timezone
 from django.utils.decorators import method_decorator
 from django.views.decorators.http import require_POST
 
-from forum.models import Comment, CommentVote, Community, Membership, Thread, ThreadVote
+from forum.models import Comment, CommentVote, Community, CommunitySanction, Membership, Report, Thread, ThreadVote
+from forum.templatetags.forum_extras import render_body
 from pans_agora.utils import ratelimit, safe_next
 
 from .forms import (
@@ -821,7 +822,7 @@ def live_poll(request):
                 request=request,
             )
 
-        # 4. Profile page friend actions live region
+        # 4. Profile page friend actions & stats live region
         profile_username = request.GET.get("profile_user", "").strip()
         if profile_username:
             p_user = User.objects.filter(username__iexact=profile_username, is_active=True).first()
@@ -832,16 +833,28 @@ def live_poll(request):
                     {"profile_user": p_user, "rel": rel_state, "friend_request": fr},
                     request=request,
                 )
-                data["profile_friends_count"] = len(p_user.friend_ids())
+                p_friend_ids = p_user.friend_ids()
+                data["profile_friends_count"] = len(p_friend_ids)
+                data["profile_threads_count"] = p_user.threads.count()
+                data["profile_comments_count"] = p_user.comments.filter(is_deleted=False).count()
+                if request.GET.get("profile_friends_grid") == "1":
+                    p_friends = list(User.objects.filter(pk__in=p_friend_ids, is_active=True).order_by("username")[:20])
+                    if p_friends:
+                        data["profile_friends_grid_html"] = "".join(
+                            render_to_string("accounts/_user_card.html", {"person": f}, request=request)
+                            for f in p_friends
+                        )
+                    else:
+                        data["profile_friends_grid_html"] = '<div class="empty card"><p class="muted">No friends yet.</p></div>'
 
-    # 5. Live thread scores & comment counts for visible cards
+    # 5. Live thread scores, comment counts, titles, excerpts & pin/lock states for visible cards
     raw_ids = request.GET.get("thread_ids", "")
     if raw_ids:
         ids = [int(x) for x in raw_ids.split(",") if x.strip().isdigit()][:40]
         if ids:
             found_threads = list(
                 Thread.objects.filter(pk__in=ids).values(
-                    "id", "score", "comment_count", "title", "is_pinned", "is_locked"
+                    "id", "score", "comment_count", "title", "body", "edited_at", "is_pinned", "is_locked"
                 )
             )
             found_ids = {t["id"] for t in found_threads}
@@ -850,6 +863,8 @@ def live_poll(request):
                     "score": t["score"],
                     "comment_count": t["comment_count"],
                     "title": t["title"],
+                    "excerpt": (t["body"][:239] + "…") if len(t["body"]) > 240 else t["body"],
+                    "is_edited": bool(t["edited_at"]),
                     "is_pinned": t["is_pinned"],
                     "is_locked": t["is_locked"],
                 }
@@ -859,20 +874,124 @@ def live_poll(request):
             if deleted_ids:
                 data["deleted_thread_ids"] = deleted_ids
 
-    # 6. Live new threads in feed & community stats (when on page 1)
+    # 5b. Live community member counts for any visible community cards / sidebars
+    raw_cslugs = request.GET.get("community_slugs", "")
+    if raw_cslugs:
+        cslugs = [s.strip() for s in raw_cslugs.split(",") if s.strip()][:30]
+        if cslugs:
+            data["communities_counts"] = {
+                c["slug"]: c["member_count"]
+                for c in Community.objects.filter(slug__in=cslugs).values("slug", "member_count")
+            }
+
+    # 5c. Communities directory grid (/communities/)
+    if request.GET.get("communities_grid") == "1":
+        banned_cids = set()
+        if user.is_authenticated and not user.is_staff:
+            banned_cids = set(
+                CommunitySanction.objects.filter(user=user, kind=CommunitySanction.Kind.BAN)
+                .exclude(community__moderators=user)
+                .values_list("community_id", flat=True)
+            )
+        c_qs = Community.objects.order_by("-member_count", "name")
+        if banned_cids:
+            c_qs = c_qs.exclude(pk__in=banned_cids)
+        c_agg = c_qs.aggregate(cnt=Count("id"), max_id=Max("id"), sum_m=Sum("member_count"))
+        joined_set = (
+            set(Membership.objects.filter(user=user).values_list("community_id", flat=True)) - banned_cids
+            if user.is_authenticated
+            else set()
+        )
+        j_sig = ",".join(str(x) for x in sorted(joined_set))
+        c_sig = f"{c_agg['cnt'] or 0}:{c_agg['max_id'] or 0}:{c_agg['sum_m'] or 0}:{j_sig}"
+        data["communities_sig"] = c_sig
+        client_csig = request.GET.get("communities_sig", "")
+        if client_csig and client_csig != c_sig:
+            data["communities_grid_html"] = render_to_string(
+                "forum/_community_cards.html",
+                {"communities": list(c_qs), "joined_ids": joined_set, "user": user},
+                request=request,
+            )
+
+    # 6. Live community detail & new threads in feed (when on page 1)
     c_slug = request.GET.get("community", "").strip()
     if c_slug:
-        comm = Community.objects.filter(slug=c_slug).values("slug", "member_count").first()
-        if comm:
-            data["community_info"] = comm
+        comm_obj = Community.objects.filter(slug=c_slug).first()
+        if comm_obj:
+            sanction = comm_obj.get_sanction(user)
+            is_banned = bool(sanction and sanction.kind == CommunitySanction.Kind.BAN)
+            is_ghosted = bool(sanction and sanction.kind == CommunitySanction.Kind.GHOST)
+            is_mod = comm_obj.is_moderator(user)
+            open_reports_count = 0
+            if is_mod:
+                open_reports_count = (
+                    Report.objects.filter(resolved=False)
+                    .filter(Q(thread__community=comm_obj) | Q(comment__thread__community=comm_obj))
+                    .count()
+                )
+            data["community_info"] = {
+                "slug": comm_obj.slug,
+                "member_count": comm_obj.member_count,
+                "description": comm_obj.description or "No description yet.",
+                "is_banned": is_banned,
+                "is_ghosted": is_ghosted,
+                "open_reports_count": open_reports_count,
+            }
+
+    # 6b. Live Community Management Dashboard (/c/<slug>/manage/)
+    manage_slug = request.GET.get("manage_community", "").strip()
+    if manage_slug and user.is_authenticated:
+        m_comm = Community.objects.filter(slug=manage_slug).first()
+        if m_comm and m_comm.is_moderator(user):
+            moderators = list(m_comm.moderators.filter(is_active=True).order_by("username"))
+            bans = list(m_comm.sanctions.filter(kind=CommunitySanction.Kind.BAN).select_related("user", "created_by"))
+            ghosts = list(
+                m_comm.sanctions.filter(kind=CommunitySanction.Kind.GHOST).select_related("user", "created_by")
+            )
+            reports = list(
+                Report.objects.filter(resolved=False)
+                .filter(Q(thread__community=m_comm) | Q(comment__thread__community=m_comm))
+                .select_related("reporter", "thread", "comment", "thread__author", "comment__author", "comment__thread")[:50]
+            )
+            data["manage"] = {
+                "slug": m_comm.slug,
+                "member_count": m_comm.member_count,
+                "mod_count": len(moderators),
+                "sanctions_html": render_to_string(
+                    "forum/_mod_sanctions_lists.html",
+                    {"community": m_comm, "bans": bans, "ghosts": ghosts, "user": user},
+                    request=request,
+                ),
+                "reports_html": render_to_string(
+                    "forum/_mod_reports_list.html",
+                    {"community": m_comm, "reports": reports, "user": user},
+                    request=request,
+                ),
+                "team_html": render_to_string(
+                    "forum/_mod_team_list.html",
+                    {"community": m_comm, "moderators": moderators, "user": user},
+                    request=request,
+                ),
+            }
 
     feed = request.GET.get("feed", "")
     max_tid_raw = request.GET.get("max_thread_id", "")
     if feed and max_tid_raw.isdigit() and request.GET.get("page", "1") == "1":
         max_tid = int(max_tid_raw)
         qs = Thread.objects.filter(pk__gt=max_tid).select_related("author", "community").order_by("-created_at")
+        if user.is_authenticated and not user.is_staff:
+            banned_cids = set(
+                CommunitySanction.objects.filter(user=user, kind=CommunitySanction.Kind.BAN)
+                .exclude(community__moderators=user)
+                .values_list("community_id", flat=True)
+            )
+            if banned_cids:
+                qs = qs.exclude(community_id__in=banned_cids)
         if feed == "community":
             qs = qs.filter(community__slug=c_slug)
+        elif feed == "profile":
+            feed_profile = request.GET.get("feed_profile", "").strip()
+            qs = qs.filter(author__username__iexact=feed_profile)
         elif feed == "mine" and user.is_authenticated:
             joined = set(Membership.objects.filter(user=user).values_list("community_id", flat=True))
             qs = qs.filter(community_id__in=joined)
@@ -893,21 +1012,46 @@ def live_poll(request):
             )
             data["new_threads_html"] = cards_html
 
-    # 7. Live comments tree for an open thread (full page or quick-view drawer)
+    # 7. Live comments tree & thread state for an open thread (full page or quick-view drawer)
     open_tid_raw = request.GET.get("open_thread_id", "")
     if open_tid_raw.isdigit():
         open_thread = Thread.objects.select_related("community", "author").filter(pk=int(open_tid_raw)).first()
-        if open_thread:
+        if not open_thread:
+            data["open_thread_deleted"] = True
+        elif open_thread.community.is_banned(user):
+            data["open_thread_banned"] = True
+        else:
+            is_mod = open_thread.community.is_moderator(user)
+            is_ghosted = open_thread.community.is_ghosted(user)
+            box_state = "ghost" if is_ghosted else ("locked" if open_thread.is_locked else "open")
+            data["open_thread_meta"] = {
+                "id": open_thread.pk,
+                "community_url": open_thread.community.get_absolute_url(),
+                "community_slug": open_thread.community.slug,
+                "has_body": bool(open_thread.body),
+                "body_html": str(render_body(open_thread.body)) if open_thread.body else "",
+                "is_edited": bool(open_thread.edited_at),
+                "is_pinned": open_thread.is_pinned,
+                "is_locked": open_thread.is_locked,
+                "is_ghosted": is_ghosted,
+                "box_state": box_state,
+            }
+            data["comment_scores"] = {
+                str(c["id"]): c["score"]
+                for c in open_thread.comments.values("id", "score")
+            }
             agg = open_thread.comments.aggregate(
                 max_id=Max("id"),
                 sum_score=Sum("score"),
                 max_edit=Max("edited_at"),
                 deleted_cnt=Count("id", filter=Q(is_deleted=True)),
             )
+            sanc_cnt = open_thread.community.sanctions.count() if is_mod else 0
             sig = (
                 f"{open_thread.comment_count}:{agg['max_id'] or 0}:"
                 f"{agg['sum_score'] or 0}:{agg['deleted_cnt'] or 0}:"
-                f"{int(agg['max_edit'].timestamp()) if agg['max_edit'] else 0}"
+                f"{int(agg['max_edit'].timestamp()) if agg['max_edit'] else 0}:"
+                f"{int(open_thread.is_locked)}:{int(is_ghosted)}:{sanc_cnt}"
             )
             client_sig = request.GET.get("comments_sig", "")
             data["comments_sig"] = sig
@@ -930,15 +1074,26 @@ def live_poll(request):
                             "comment_id", "value"
                         )
                     )
+                sanctioned_map = {}
+                mod_ids = set()
+                if is_mod:
+                    sanctioned_map = dict(open_thread.community.sanctions.values_list("user_id", "kind"))
+                    mod_ids = set(open_thread.community.moderators.values_list("id", flat=True))
+                    if open_thread.community.created_by_id:
+                        mod_ids.add(open_thread.community.created_by_id)
                 data["comments_html"] = render_to_string(
                     "forum/_comments_section.html",
                     {
                         "thread": open_thread,
+                        "community": open_thread.community,
                         "comments": children.get(None, []),
                         "csort": csort,
                         "comment_sort_options": COMMENT_SORT_OPTIONS,
                         "comment_votes": comment_votes,
-                        "is_mod": open_thread.community.is_moderator(user),
+                        "is_mod": is_mod,
+                        "is_ghosted": is_ghosted,
+                        "sanctioned_map": sanctioned_map,
+                        "mod_ids": mod_ids,
                         "user": user,
                     },
                     request=request,

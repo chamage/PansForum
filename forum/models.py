@@ -44,6 +44,43 @@ class Community(models.Model):
             return False
         return user.is_staff or self.moderators.filter(pk=user.pk).exists()
 
+    def get_sanction(self, user):
+        if not user.is_authenticated or self.is_moderator(user):
+            return None
+        return self.sanctions.filter(user=user).first()
+
+    def is_banned(self, user):
+        if not user.is_authenticated or self.is_moderator(user):
+            return False
+        return self.sanctions.filter(user=user, kind=CommunitySanction.Kind.BAN).exists()
+
+    def is_ghosted(self, user):
+        if not user.is_authenticated or self.is_moderator(user):
+            return False
+        return self.sanctions.filter(user=user, kind=CommunitySanction.Kind.GHOST).exists()
+
+
+class CommunitySanction(models.Model):
+    class Kind(models.TextChoices):
+        BAN = "ban", "Banned (cannot enter community)"
+        GHOST = "ghost", "Ghosted (can view, cannot interact)"
+
+    community = models.ForeignKey(Community, on_delete=models.CASCADE, related_name="sanctions")
+    user = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name="community_sanctions")
+    kind = models.CharField(max_length=10, choices=Kind.choices)
+    reason = models.CharField(max_length=240, blank=True)
+    created_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL, null=True, blank=True, on_delete=models.SET_NULL, related_name="issued_sanctions"
+    )
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ["-created_at"]
+        constraints = [models.UniqueConstraint(fields=["community", "user"], name="unique_community_sanction")]
+
+    def __str__(self):
+        return f"{self.user} — {self.kind} in c/{self.community.slug}"
+
 
 class Membership(models.Model):
     user = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name="memberships")

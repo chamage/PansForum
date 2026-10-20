@@ -51,11 +51,11 @@
     {% endif %}
     <div class="card side-card">
       <h3>Popular communities</h3>
-      <ul class="community-mini">
+      <ul class="community-mini" id="popular-communities-list">
         {% for community in popular %}
           <li>
             <a href="{{ community.get_absolute_url }}"><span class="community-dot" aria-hidden="true">{{ community.name|first|upper }}</span><span>c/{{ community.slug }}</span></a>
-            <span class="muted small">{{ community.member_count }}</span>
+            <span class="muted small" data-community-count="{{ community.slug }}">{{ community.member_count }}</span>
           </li>
         {% empty %}
           <li class="muted">No communities yet.</li>

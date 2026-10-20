@@ -1,0 +1,47 @@
+{% load forum_extras %}
+<div class="mod-section__head">
+  <h2>🚩 Open reports ({{ reports|length }})</h2>
+  <p class="muted small">Posts and comments flagged by students in <code>c/{{ community.slug }}</code>.</p>
+</div>
+
+{% if reports %}
+  <ul class="mod-report-list">
+    {% for rep in reports %}
+      <li class="mod-report-item">
+        <div class="mod-report-item__body">
+          <div class="meta">
+            <span class="tag tag--lock">{{ rep.get_reason_display }}</span>
+            <span>reported by {% if rep.reporter %}{% user_link rep.reporter %}{% else %}[deleted]{% endif %}</span>
+            <span aria-hidden="true">·</span>
+            <span>{{ rep.created_at|timesince }} ago</span>
+          </div>
+          {% if rep.thread %}
+            <p class="mod-report-item__target">
+              <strong>Thread:</strong> <a href="{{ rep.thread.get_absolute_url }}">{{ rep.thread.title }}</a>
+              {% if rep.thread.author %}by {% user_link rep.thread.author %}{% endif %}
+            </p>
+          {% elif rep.comment %}
+            <p class="mod-report-item__target">
+              <strong>Comment:</strong> <a href="{{ rep.comment.get_absolute_url }}">{{ rep.comment.body|truncatechars:140 }}</a>
+              {% if rep.comment.author %}by {% user_link rep.comment.author %}{% endif %}
+            </p>
+          {% endif %}
+          {% if rep.details %}<p class="muted small">Note: {{ rep.details }}</p>{% endif %}
+        </div>
+        <div class="mod-report-item__actions">
+          <form method="post" action="{% url 'forum:community_report_resolve' community.slug rep.pk %}" class="inline" data-mod-action data-confirm="Delete the reported content and resolve this report?">
+            {% csrf_token %}
+            <input type="hidden" name="delete_content" value="1">
+            <button type="submit" class="btn btn--danger btn--sm">Delete content</button>
+          </form>
+          <form method="post" action="{% url 'forum:community_report_resolve' community.slug rep.pk %}" class="inline" data-mod-action>
+            {% csrf_token %}
+            <button type="submit" class="btn btn--ghost btn--sm">Dismiss</button>
+          </form>
+        </div>
+      </li>
+    {% endfor %}
+  </ul>
+{% else %}
+  <p class="muted small">🎉 All clear — no open reports in this community.</p>
+{% endif %}

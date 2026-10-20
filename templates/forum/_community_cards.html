@@ -1,0 +1,15 @@
+{% for community in communities %}
+  <article class="card community-card" data-community-card="{{ community.slug }}">
+    <div class="community-card__top">
+      <span class="community-dot community-dot--lg" aria-hidden="true">{{ community.name|first|upper }}</span>
+      <div>
+        <h2><a href="{{ community.get_absolute_url }}">{{ community.name }}</a></h2>
+        <span class="muted small">c/{{ community.slug }} · <span data-community-member-count="{{ community.slug }}">{{ community.member_count }} member{{ community.member_count|pluralize }}</span></span>
+      </div>
+    </div>
+    <p class="community-card__desc" data-community-desc-short="{{ community.slug }}">{{ community.description|default:"No description yet."|truncatechars:160 }}</p>
+    <div class="community-card__foot" data-join-slot="{{ community.slug }}">{% include "forum/_join_button.html" %}</div>
+  </article>
+{% empty %}
+  <div class="empty card"><h2>No communities yet</h2><p class="muted">Create the first one!</p></div>
+{% endfor %}

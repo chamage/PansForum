@@ -7,12 +7,12 @@
       <span>{% user_link thread.author %}</span>
       <span aria-hidden="true">·</span>
       <time datetime="{{ thread.created_at|date:'c' }}" title="{{ thread.created_at }}">{{ thread.created_at|timesince }} ago</time>
-      {% if thread.edited_at %}<span class="muted" title="{{ thread.edited_at }}">· edited</span>{% endif %}
-      {% if thread.is_pinned %}<span class="tag tag--pin">Pinned</span>{% endif %}
-      {% if thread.is_locked %}<span class="tag tag--lock">Locked</span>{% endif %}
+      <span class="muted" data-thread-edited="{{ thread.pk }}" {% if not thread.edited_at %}hidden{% endif %}>· edited</span>
+      <span class="tag tag--pin" data-thread-pin-tag="{{ thread.pk }}" {% if not thread.is_pinned %}hidden{% endif %}>Pinned</span>
+      <span class="tag tag--lock" data-thread-lock-tag="{{ thread.pk }}" {% if not thread.is_locked %}hidden{% endif %}>Locked</span>
     </div>
     <h1 class="thread__title" data-thread-title="{{ thread.pk }}">{{ thread.title }}</h1>
-    {% if thread.body %}<div class="prose" data-thread-body="{{ thread.pk }}">{{ thread.body|render_body }}</div>{% endif %}
+    <div class="prose" data-thread-body="{{ thread.pk }}" {% if not thread.body %}hidden{% endif %}>{% if thread.body %}{{ thread.body|render_body }}{% endif %}</div>
 
     <div class="actions">
       <span class="pill">
@@ -20,7 +20,7 @@
         <span data-thread-comment-count="{{ thread.pk }}">{{ thread.comment_count }} comment{{ thread.comment_count|pluralize }}</span>
       </span>
       {% if user.is_authenticated %}
-        {% if thread.author_id == user.pk %}
+        {% if thread.author_id == user.pk and not is_ghosted %}
           <a class="action" href="{% url 'forum:thread_edit' thread.pk %}">Edit</a>
         {% endif %}
         {% if thread.author_id == user.pk or is_mod %}
@@ -29,8 +29,29 @@
           </form>
         {% endif %}
         {% if is_mod %}
-          <form method="post" action="{% url 'forum:thread_pin' thread.pk %}" class="inline">{% csrf_token %}<button type="submit" class="action">{% if thread.is_pinned %}Unpin{% else %}Pin{% endif %}</button></form>
-          <form method="post" action="{% url 'forum:thread_lock' thread.pk %}" class="inline">{% csrf_token %}<button type="submit" class="action">{% if thread.is_locked %}Unlock{% else %}Lock{% endif %}</button></form>
+          <form method="post" action="{% url 'forum:thread_pin' thread.pk %}" class="inline" data-mod-action>{% csrf_token %}<button type="submit" class="action" data-thread-pin-btn="{{ thread.pk }}">{% if thread.is_pinned %}Unpin{% else %}Pin{% endif %}</button></form>
+          <form method="post" action="{% url 'forum:thread_lock' thread.pk %}" class="inline" data-mod-action>{% csrf_token %}<button type="submit" class="action" data-thread-lock-btn="{{ thread.pk }}">{% if thread.is_locked %}Unlock{% else %}Lock{% endif %}</button></form>
+          {% if thread.author and thread.author_id != user.pk and thread.author_id not in mod_ids %}
+            {% with author_sanction=sanctioned_map|get_item:thread.author_id %}
+              {% if author_sanction == 'ghost' %}
+                <form method="post" action="{% url 'forum:community_sanction_remove' community.slug thread.author.username %}" class="inline" data-mod-action>
+                  {% csrf_token %}<input type="hidden" name="next" value="{{ thread.get_absolute_url }}">
+                  <button type="submit" class="action" title="Restore interaction permissions">👻 Un-ghost @{{ thread.author.username }}</button>
+                </form>
+              {% else %}
+                <form method="post" action="{% url 'forum:community_sanction_set' community.slug %}" class="inline" data-mod-action data-confirm="Ghost @{{ thread.author.username }} in c/{{ community.slug }}? They will still be able to view the community, but won't be able to post, comment, or vote.">
+                  {% csrf_token %}<input type="hidden" name="username" value="{{ thread.author.username }}"><input type="hidden" name="kind" value="ghost"><input type="hidden" name="next" value="{{ thread.get_absolute_url }}">
+                  <button type="submit" class="action" title="Allow viewing only (cannot post, comment, or vote)">👻 Ghost user</button>
+                </form>
+              {% endif %}
+              {% if author_sanction != 'ban' %}
+                <form method="post" action="{% url 'forum:community_sanction_set' community.slug %}" class="inline" data-mod-action data-confirm="Ban @{{ thread.author.username }} completely from c/{{ community.slug }}? They will not be able to enter or view this community.">
+                  {% csrf_token %}<input type="hidden" name="username" value="{{ thread.author.username }}"><input type="hidden" name="kind" value="ban"><input type="hidden" name="next" value="{{ thread.get_absolute_url }}">
+                  <button type="submit" class="action action--danger" title="Block user from entering c/{{ community.slug }}">🚫 Ban user</button>
+                </form>
+              {% endif %}
+            {% endwith %}
+          {% endif %}
         {% endif %}
         {% if thread.author_id != user.pk %}
           <a class="action" href="{% url 'forum:thread_report' thread.pk %}">Report</a>
@@ -41,21 +62,25 @@
 </article>
 
 <section id="comments" class="card discussion">
-  {% if thread.is_locked %}
-    <div class="alert alert--info">🔒 This thread is locked. You can read it, but new comments are turned off.</div>
-  {% elif user.is_authenticated %}
-    <form method="post" action="{% url 'forum:comment_create' thread.pk %}" class="comment-form" data-live-comment-form="{{ thread.pk }}">
-      {% csrf_token %}
-      <label class="sr-only" for="id_body">Comment</label>
-      {{ form.body }}
-      <div class="form-actions"><button class="btn btn--primary" type="submit">Comment</button></div>
-    </form>
-  {% else %}
-    <div class="alert alert--info">
-      <a href="{% url 'accounts:login' %}?next={{ thread.get_absolute_url|urlencode }}">Log in</a> or
-      <a href="{% url 'accounts:register' %}">sign up</a> to join the discussion.
-    </div>
-  {% endif %}
+  <div id="thread-comment-box-slot" data-box-state="{% if is_ghosted %}ghost{% elif thread.is_locked %}locked{% else %}open{% endif %}">
+    {% if is_ghosted %}
+      <div class="alert alert--info">👻 You are in read-only mode in <strong>c/{{ community.slug }}</strong>. You can read posts and comments, but cannot reply or vote.</div>
+    {% elif thread.is_locked %}
+      <div class="alert alert--info">🔒 This thread is locked. You can read it, but new comments are turned off.</div>
+    {% elif user.is_authenticated %}
+      <form method="post" action="{% url 'forum:comment_create' thread.pk %}" class="comment-form" data-live-comment-form="{{ thread.pk }}">
+        {% csrf_token %}
+        <label class="sr-only" for="id_body">Comment</label>
+        {{ form.body }}
+        <div class="form-actions"><button class="btn btn--primary" type="submit">Comment</button></div>
+      </form>
+    {% else %}
+      <div class="alert alert--info">
+        <a href="{% url 'accounts:login' %}?next={{ thread.get_absolute_url|urlencode }}">Log in</a> or
+        <a href="{% url 'accounts:register' %}">sign up</a> to join the discussion.
+      </div>
+    {% endif %}
+  </div>
 
   <div data-live-comments="{{ thread.pk }}" data-thread-id="{{ thread.pk }}" data-csort="{{ csort }}">
     {% include "forum/_comments_section.html" %}

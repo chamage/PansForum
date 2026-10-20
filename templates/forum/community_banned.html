@@ -1,0 +1,20 @@
+{% extends "base.html" %}
+{% block title %}Banned from c/{{ community.slug }} · {{ SITE_NAME }}{% endblock %}
+{% block content %}
+<div class="narrow">
+  <div class="card empty">
+    <p class="empty__emoji" aria-hidden="true">🚫</p>
+    <h1>You are banned from c/{{ community.slug }}</h1>
+    <p class="muted">The moderators of <strong>{{ community.name }}</strong> have restricted your access to this community.</p>
+    {% if sanction and sanction.reason %}
+      <div class="alert alert--info">
+        <strong>Reason:</strong> {{ sanction.reason }}
+      </div>
+    {% endif %}
+    <div class="hero__actions">
+      <a class="btn btn--primary" href="{% url 'forum:home' %}">Back to feed</a>
+      <a class="btn btn--ghost" href="{% url 'forum:community_list' %}">Browse other communities</a>
+    </div>
+  </div>
+</div>
+{% endblock %}

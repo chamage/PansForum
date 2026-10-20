@@ -12,9 +12,9 @@
   <aside class="layout__side">
     <div class="card side-card">
       <h3><a href="{{ community.get_absolute_url }}">c/{{ community.slug }}</a></h3>
-      <p>{{ community.description|default:"No description yet."|truncatechars:200 }}</p>
-      <p class="muted small">{{ community.member_count }} member{{ community.member_count|pluralize }}</p>
-      {% include "forum/_join_button.html" %}
+      <p data-community-desc-short="{{ community.slug }}">{{ community.description|default:"No description yet."|truncatechars:200 }}</p>
+      <p class="muted small" data-community-member-count="{{ community.slug }}">{{ community.member_count }} member{{ community.member_count|pluralize }}</p>
+      <div data-join-slot="{{ community.slug }}">{% include "forum/_join_button.html" %}</div>
     </div>
   </aside>
 </div>

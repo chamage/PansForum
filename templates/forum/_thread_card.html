@@ -6,11 +6,11 @@
       <span>by {% user_link thread.author %}</span>
       <span aria-hidden="true">·</span>
       <time datetime="{{ thread.created_at|date:'c' }}" title="{{ thread.created_at }}">{{ thread.created_at|timesince }} ago</time>
-      {% if thread.is_pinned and show_pins %}<span class="tag tag--pin">Pinned</span>{% endif %}
-      {% if thread.is_locked %}<span class="tag tag--lock">Locked</span>{% endif %}
+      {% if show_pins %}<span class="tag tag--pin" data-thread-pin-tag="{{ thread.pk }}" {% if not thread.is_pinned %}hidden{% endif %}>Pinned</span>{% endif %}
+      <span class="tag tag--lock" data-thread-lock-tag="{{ thread.pk }}" {% if not thread.is_locked %}hidden{% endif %}>Locked</span>
     </div>
     <h2 class="thread-card__title"><a href="{{ thread.get_absolute_url }}" data-quick-view="{{ thread.get_absolute_url }}" data-thread-title="{{ thread.pk }}">{{ thread.title }}</a></h2>
-    {% if thread.body %}<p class="thread-card__excerpt" data-thread-excerpt="{{ thread.pk }}">{{ thread.body|truncatechars:240 }}</p>{% endif %}
+    <p class="thread-card__excerpt" data-thread-excerpt="{{ thread.pk }}" {% if not thread.body %}hidden{% endif %}>{{ thread.body|truncatechars:240 }}</p>
     <div class="thread-card__foot">
       <a class="pill" href="{{ thread.get_absolute_url }}#comments" data-quick-view="{{ thread.get_absolute_url }}">
         <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 5h16v11H8l-4 4z"/></svg>

@@ -9,6 +9,8 @@ from django.db import IntegrityError, transaction
 from django.db.models import F, Q
 from django.http import JsonResponse
 from django.shortcuts import get_object_or_404, redirect, render
+from django.template.loader import render_to_string
+from django.urls import reverse
 from django.utils import timezone
 from django.utils.text import slugify
 from django.views.decorators.http import require_POST
@@ -16,7 +18,7 @@ from django.views.decorators.http import require_POST
 from pans_agora.utils import ratelimit, safe_next
 
 from .forms import CommentForm, CommunityForm, ReportForm, ThreadEditForm, ThreadForm
-from .models import Comment, CommentVote, Community, Membership, Report, Thread, ThreadVote
+from .models import Comment, CommentVote, Community, CommunitySanction, Membership, Report, Thread, ThreadVote
 
 THREAD_SORTS = {
     "hot": ("-hot_rank",),
@@ -59,6 +61,29 @@ def _joined_ids(user):
     return set(Membership.objects.filter(user=user).values_list("community_id", flat=True))
 
 
+def _banned_community_ids(user):
+    if not user.is_authenticated or user.is_staff:
+        return set()
+    return set(
+        CommunitySanction.objects.filter(user=user, kind=CommunitySanction.Kind.BAN)
+        .exclude(community__moderators=user)
+        .values_list("community_id", flat=True)
+    )
+
+
+def _render_banned(request, community, sanction=None):
+    return render(
+        request,
+        "forum/community_banned.html",
+        {
+            "community": community,
+            "sanction": sanction,
+            "is_drawer": request.headers.get("x-quick-view") == "1" or request.GET.get("drawer") == "1",
+        },
+        status=403,
+    )
+
+
 def _is_ajax(request):
     return request.headers.get("x-requested-with") == "XMLHttpRequest"
 
@@ -71,12 +96,20 @@ def _is_ajax(request):
 def home(request):
     sort = _sort(request, THREAD_SORTS, "hot")
     joined = _joined_ids(request.user)
+    banned = _banned_community_ids(request.user)
+    joined -= banned
     feed = "all" if request.GET.get("feed") == "all" or not joined else "mine"
 
     threads = Thread.objects.select_related("author", "community")
+    if banned:
+        threads = threads.exclude(community_id__in=banned)
     if feed == "mine":
         threads = threads.filter(community_id__in=joined)
     page = _page(request, threads.order_by(*THREAD_SORTS[sort]))
+
+    popular_qs = Community.objects.order_by("-member_count", "name")
+    if banned:
+        popular_qs = popular_qs.exclude(pk__in=banned)
 
     context = {
         "page": page,
@@ -85,7 +118,7 @@ def home(request):
         "feed": feed,
         "has_joined": bool(joined),
         "votes": _thread_votes(request.user, page.object_list),
-        "popular": Community.objects.order_by("-member_count", "name")[:8],
+        "popular": popular_qs[:8],
         "joined_ids": joined,
     }
     return render(request, "forum/home.html", context)
@@ -93,6 +126,7 @@ def home(request):
 
 def search(request):
     q = " ".join(request.GET.get("q", "").split())[:100]
+    banned = _banned_community_ids(request.user)
     threads = communities = users = None
     if len(q) >= 2:
         threads = (
@@ -100,7 +134,12 @@ def search(request):
             .select_related("author", "community")
             .order_by("-hot_rank")
         )
-        communities = Community.objects.filter(Q(name__icontains=q) | Q(description__icontains=q))[:6]
+        if banned:
+            threads = threads.exclude(community_id__in=banned)
+        communities = Community.objects.filter(Q(name__icontains=q) | Q(description__icontains=q))
+        if banned:
+            communities = communities.exclude(pk__in=banned)
+        communities = communities[:6]
         users = get_user_model().objects.filter(
             Q(username__icontains=q) | Q(display_name__icontains=q), is_active=True
         )[:6]
@@ -128,10 +167,14 @@ def guidelines(request):
 
 
 def community_list(request):
+    banned = _banned_community_ids(request.user)
+    qs = Community.objects.order_by("-member_count", "name")
+    if banned:
+        qs = qs.exclude(pk__in=banned)
     return render(
         request,
         "forum/community_list.html",
-        {"communities": Community.objects.order_by("-member_count", "name"), "joined_ids": _joined_ids(request.user)},
+        {"communities": qs, "joined_ids": _joined_ids(request.user) - banned},
     )
 
 
@@ -154,9 +197,22 @@ def community_create(request):
 
 def community_detail(request, slug):
     community = get_object_or_404(Community, slug=slug)
+    sanction = community.get_sanction(request.user)
+    if sanction and sanction.kind == CommunitySanction.Kind.BAN:
+        return _render_banned(request, community, sanction)
+
+    is_mod = community.is_moderator(request.user)
+    is_ghosted = bool(sanction and sanction.kind == CommunitySanction.Kind.GHOST)
     sort = _sort(request, THREAD_SORTS, "hot")
     threads = community.threads.select_related("author", "community").order_by("-is_pinned", *THREAD_SORTS[sort])
     page = _page(request, threads)
+    open_reports_count = 0
+    if is_mod:
+        open_reports_count = (
+            Report.objects.filter(resolved=False)
+            .filter(Q(thread__community=community) | Q(comment__thread__community=community))
+            .count()
+        )
     context = {
         "community": community,
         "page": page,
@@ -164,36 +220,266 @@ def community_detail(request, slug):
         "sort_options": THREAD_SORT_OPTIONS,
         "votes": _thread_votes(request.user, page.object_list),
         "joined_ids": _joined_ids(request.user),
-        "is_mod": community.is_moderator(request.user),
+        "is_mod": is_mod,
+        "is_ghosted": is_ghosted,
+        "sanction": sanction,
+        "open_reports_count": open_reports_count,
         "moderators": community.moderators.filter(is_active=True),
     }
     return render(request, "forum/community_detail.html", context)
 
 
 @login_required
-def community_edit(request, slug):
+def community_manage(request, slug):
     community = get_object_or_404(Community, slug=slug)
     if not community.is_moderator(request.user):
         raise PermissionDenied
     form = CommunityForm(request.POST or None, instance=community)
     if request.method == "POST" and form.is_valid():
         form.save()
-        messages.success(request, "Community updated.")
+        messages.success(request, "Community details updated.")
+        return redirect("forum:community_manage", slug=community.slug)
+
+    moderators = list(community.moderators.filter(is_active=True).order_by("username"))
+    bans = list(
+        community.sanctions.filter(kind=CommunitySanction.Kind.BAN).select_related("user", "created_by")
+    )
+    ghosts = list(
+        community.sanctions.filter(kind=CommunitySanction.Kind.GHOST).select_related("user", "created_by")
+    )
+    reports = list(
+        Report.objects.filter(resolved=False)
+        .filter(Q(thread__community=community) | Q(comment__thread__community=community))
+        .select_related("reporter", "thread", "comment", "thread__author", "comment__author", "comment__thread")[:50]
+    )
+    return render(
+        request,
+        "forum/community_manage.html",
+        {
+            "form": form,
+            "community": community,
+            "moderators": moderators,
+            "bans": bans,
+            "ghosts": ghosts,
+            "reports": reports,
+        },
+    )
+
+
+community_edit = community_manage
+
+
+@login_required
+@require_POST
+def community_mod_add(request, slug):
+    community = get_object_or_404(Community, slug=slug)
+    if not community.is_moderator(request.user):
+        raise PermissionDenied
+    username = request.POST.get("username", "").strip().lstrip("@")
+    User = get_user_model()
+    target = User.objects.filter(username__iexact=username, is_active=True).first()
+    if not target:
+        err = f"Could not find an active user named '{username}'."
+        if request.headers.get("x-live-action") == "1":
+            return JsonResponse({"ok": False, "error": err}, status=400)
+        messages.error(request, err)
+        return safe_next(request, reverse("forum:community_manage", args=[community.slug]))
+
+    with transaction.atomic():
+        community.moderators.add(target)
+        CommunitySanction.objects.filter(community=community, user=target).delete()
+        _, created = Membership.objects.get_or_create(user=target, community=community)
+        if created:
+            Community.objects.filter(pk=community.pk).update(member_count=F("member_count") + 1)
+    toast = f"@{target.username} is now a moderator of c/{community.slug}."
+    if request.headers.get("x-live-action") == "1":
+        return JsonResponse({"ok": True, "toast": toast})
+    messages.success(request, toast)
+    return safe_next(request, reverse("forum:community_manage", args=[community.slug]))
+
+
+@login_required
+@require_POST
+def community_mod_remove(request, slug, username):
+    community = get_object_or_404(Community, slug=slug)
+    if not community.is_moderator(request.user):
+        raise PermissionDenied
+    User = get_user_model()
+    target = get_object_or_404(User, username__iexact=username)
+    if community.created_by_id == target.pk:
+        err = "The community founder cannot be removed from the moderator team."
+        if request.headers.get("x-live-action") == "1":
+            return JsonResponse({"ok": False, "error": err}, status=400)
+        messages.error(request, err)
+        return safe_next(request, reverse("forum:community_manage", args=[community.slug]))
+
+    community.moderators.remove(target)
+    toast = f"@{target.username} was removed from the moderator team."
+    if target.pk == request.user.pk and not request.user.is_staff:
+        if request.headers.get("x-live-action") == "1":
+            return JsonResponse({"ok": True, "redirect": community.get_absolute_url()})
+        messages.info(request, toast)
         return redirect(community)
-    return render(request, "forum/community_form.html", {"form": form, "community": community})
+    if request.headers.get("x-live-action") == "1":
+        return JsonResponse({"ok": True, "toast": toast})
+    messages.info(request, toast)
+    return safe_next(request, reverse("forum:community_manage", args=[community.slug]))
+
+
+@login_required
+@require_POST
+def community_sanction_set(request, slug):
+    community = get_object_or_404(Community, slug=slug)
+    if not community.is_moderator(request.user):
+        raise PermissionDenied
+    username = request.POST.get("username", "").strip().lstrip("@")
+    kind = request.POST.get("kind", "").strip()
+    reason = " ".join(request.POST.get("reason", "").split())[:240]
+
+    if kind not in (CommunitySanction.Kind.BAN, CommunitySanction.Kind.GHOST):
+        if request.headers.get("x-live-action") == "1":
+            return JsonResponse({"ok": False, "error": "Choose either Ban or Ghost."}, status=400)
+        messages.error(request, "Choose either Ban or Ghost.")
+        return safe_next(request, reverse("forum:community_manage", args=[community.slug]))
+
+    User = get_user_model()
+    target = User.objects.filter(username__iexact=username, is_active=True).first()
+    if not target:
+        err = f"Could not find an active user named '{username}'."
+        if request.headers.get("x-live-action") == "1":
+            return JsonResponse({"ok": False, "error": err}, status=400)
+        messages.error(request, err)
+        return safe_next(request, reverse("forum:community_manage", args=[community.slug]))
+
+    if target.pk == request.user.pk or target.pk == community.created_by_id or community.is_moderator(target):
+        err = "Moderators and the community founder cannot be banned or ghosted."
+        if request.headers.get("x-live-action") == "1":
+            return JsonResponse({"ok": False, "error": err}, status=400)
+        messages.error(request, err)
+        return safe_next(request, reverse("forum:community_manage", args=[community.slug]))
+
+    with transaction.atomic():
+        CommunitySanction.objects.update_or_create(
+            community=community,
+            user=target,
+            defaults={"kind": kind, "reason": reason, "created_by": request.user},
+        )
+        if kind == CommunitySanction.Kind.BAN:
+            deleted, _ = Membership.objects.filter(user=target, community=community).delete()
+            if deleted:
+                Community.objects.filter(pk=community.pk, member_count__gt=0).update(
+                    member_count=F("member_count") - 1
+                )
+
+    toast = (
+        f"@{target.username} has been banned from c/{community.slug}."
+        if kind == CommunitySanction.Kind.BAN
+        else f"@{target.username} has been ghosted in c/{community.slug}."
+    )
+    if request.headers.get("x-live-action") == "1":
+        return JsonResponse({"ok": True, "toast": toast})
+    messages.info(request, toast)
+    return safe_next(request, reverse("forum:community_manage", args=[community.slug]))
+
+
+@login_required
+@require_POST
+def community_sanction_remove(request, slug, username):
+    community = get_object_or_404(Community, slug=slug)
+    if not community.is_moderator(request.user):
+        raise PermissionDenied
+    User = get_user_model()
+    target = get_object_or_404(User, username__iexact=username)
+    deleted, _ = CommunitySanction.objects.filter(community=community, user=target).delete()
+    toast = f"Restrictions lifted for @{target.username} in c/{community.slug}."
+    if request.headers.get("x-live-action") == "1":
+        return JsonResponse({"ok": True, "toast": toast if deleted else ""})
+    if deleted:
+        messages.success(request, toast)
+    return safe_next(request, reverse("forum:community_manage", args=[community.slug]))
+
+
+@login_required
+@require_POST
+def community_report_resolve(request, slug, pk):
+    community = get_object_or_404(Community, slug=slug)
+    if not community.is_moderator(request.user):
+        raise PermissionDenied
+    rep = get_object_or_404(
+        Report.objects.select_related("thread", "comment", "comment__thread"),
+        pk=pk,
+    )
+    rep_comm_id = rep.thread.community_id if rep.thread_id else (rep.comment.thread.community_id if rep.comment_id else None)
+    if rep_comm_id != community.pk:
+        raise PermissionDenied
+
+    if request.POST.get("delete_content") == "1":
+        if rep.thread_id and rep.thread:
+            rep.thread.delete()
+            toast = "Reported thread deleted and report resolved."
+            if request.headers.get("x-live-action") == "1":
+                return JsonResponse({"ok": True, "toast": toast})
+            messages.info(request, toast)
+            return safe_next(request, reverse("forum:community_manage", args=[community.slug]))
+        elif rep.comment_id and rep.comment:
+            rep.comment.is_deleted = True
+            rep.comment.body = ""
+            rep.comment.save(update_fields=["is_deleted", "body"])
+            rep.resolved = True
+            rep.save(update_fields=["resolved"])
+            toast = "Reported comment deleted and report resolved."
+            if request.headers.get("x-live-action") == "1":
+                return JsonResponse({"ok": True, "toast": toast})
+            messages.info(request, toast)
+            return safe_next(request, reverse("forum:community_manage", args=[community.slug]))
+
+    rep.resolved = True
+    rep.save(update_fields=["resolved"])
+    toast = "Report marked as resolved."
+    if request.headers.get("x-live-action") == "1":
+        return JsonResponse({"ok": True, "toast": toast})
+    messages.success(request, toast)
+    return safe_next(request, reverse("forum:community_manage", args=[community.slug]))
 
 
 @login_required
 @require_POST
 def community_join(request, slug):
     community = get_object_or_404(Community, slug=slug)
+    sanction = community.get_sanction(request.user)
+    if sanction and sanction.kind == CommunitySanction.Kind.BAN:
+        if request.headers.get("x-live-action") == "1":
+            return JsonResponse({"ok": False, "error": f"You are banned from c/{community.slug}."}, status=403)
+        return _render_banned(request, community, sanction)
+    if sanction and sanction.kind == CommunitySanction.Kind.GHOST:
+        err = f"You are in read-only mode in c/{community.slug} and cannot join."
+        if request.headers.get("x-live-action") == "1":
+            return JsonResponse({"ok": False, "error": err}, status=403)
+        messages.error(request, err)
+        return safe_next(request, community.get_absolute_url())
     try:
         with transaction.atomic():
             Membership.objects.create(user=request.user, community=community)
             Community.objects.filter(pk=community.pk).update(member_count=F("member_count") + 1)
-        messages.success(request, f"You joined c/{community.slug}.")
+        if request.headers.get("x-live-action") != "1":
+            messages.success(request, f"You joined c/{community.slug}.")
     except IntegrityError:
         pass
+    if request.headers.get("x-live-action") == "1":
+        community.refresh_from_db(fields=["member_count"])
+        join_html = render_to_string(
+            "forum/_join_button.html",
+            {"community": community, "joined_ids": {community.pk}, "user": request.user},
+            request=request,
+        )
+        return JsonResponse(
+            {
+                "ok": True,
+                "slug": community.slug,
+                "member_count": community.member_count,
+                "join_html": join_html,
+            }
+        )
     return safe_next(request, community.get_absolute_url())
 
 
@@ -205,6 +491,21 @@ def community_leave(request, slug):
         deleted, _ = Membership.objects.filter(user=request.user, community=community).delete()
         if deleted:
             Community.objects.filter(pk=community.pk, member_count__gt=0).update(member_count=F("member_count") - 1)
+    if request.headers.get("x-live-action") == "1":
+        community.refresh_from_db(fields=["member_count"])
+        join_html = render_to_string(
+            "forum/_join_button.html",
+            {"community": community, "joined_ids": set(), "user": request.user},
+            request=request,
+        )
+        return JsonResponse(
+            {
+                "ok": True,
+                "slug": community.slug,
+                "member_count": community.member_count,
+                "join_html": join_html,
+            }
+        )
     if deleted:
         messages.info(request, f"You left c/{community.slug}.")
     return safe_next(request, community.get_absolute_url())
@@ -219,11 +520,23 @@ def community_leave(request, slug):
 @ratelimit("thread", 5, 600)
 def thread_create(request, slug=None):
     community = get_object_or_404(Community, slug=slug) if slug else None
+    if community is not None:
+        sanction = community.get_sanction(request.user)
+        if sanction and sanction.kind == CommunitySanction.Kind.BAN:
+            return _render_banned(request, community, sanction)
+        if sanction and sanction.kind == CommunitySanction.Kind.GHOST:
+            messages.error(request, f"You are in read-only mode in c/{community.slug} and cannot create threads.")
+            return redirect(community)
+
     initial = {}
     if community is None and request.GET.get("community"):
         initial["community"] = Community.objects.filter(slug=request.GET["community"]).first()
-    form = ThreadForm(request.POST or None, community=community, initial=initial)
+    form = ThreadForm(request.POST or None, community=community, user=request.user, initial=initial)
     if request.method == "POST" and form.is_valid():
+        target_community = community if community is not None else form.cleaned_data.get("community")
+        if target_community is not None and target_community.get_sanction(request.user) is not None:
+            messages.error(request, f"You cannot post in c/{target_community.slug}.")
+            return redirect(target_community)
         with transaction.atomic():
             thread = form.save(commit=False)
             if community is not None:
@@ -241,6 +554,13 @@ def thread_detail(request, slug, pk, thread_slug=None):
     if slug != thread.community.slug or thread_slug != thread.slug:
         return redirect(thread, permanent=True)
 
+    sanction = thread.community.get_sanction(request.user)
+    if sanction and sanction.kind == CommunitySanction.Kind.BAN:
+        return _render_banned(request, thread.community, sanction)
+
+    is_mod = thread.community.is_moderator(request.user)
+    is_ghosted = bool(sanction and sanction.kind == CommunitySanction.Kind.GHOST)
+
     csort = _sort(request, COMMENT_SORTS, "best")
     comments = list(thread.comments.select_related("author").order_by(*COMMENT_SORTS[csort]))
     children = defaultdict(list)
@@ -255,6 +575,16 @@ def thread_detail(request, slug, pk, thread_slug=None):
             CommentVote.objects.filter(user=request.user, comment__thread=thread).values_list("comment_id", "value")
         )
 
+    sanctioned_map = {}
+    mod_ids = set()
+    if is_mod:
+        sanctioned_map = dict(
+            thread.community.sanctions.values_list("user_id", "kind")
+        )
+        mod_ids = set(thread.community.moderators.values_list("id", flat=True))
+        if thread.community.created_by_id:
+            mod_ids.add(thread.community.created_by_id)
+
     context = {
         "thread": thread,
         "community": thread.community,
@@ -264,7 +594,11 @@ def thread_detail(request, slug, pk, thread_slug=None):
         "votes": _thread_votes(request.user, [thread]),
         "comment_votes": comment_votes,
         "form": CommentForm(),
-        "is_mod": thread.community.is_moderator(request.user),
+        "is_mod": is_mod,
+        "is_ghosted": is_ghosted,
+        "sanction": sanction,
+        "sanctioned_map": sanctioned_map,
+        "mod_ids": mod_ids,
         "joined_ids": _joined_ids(request.user),
     }
     if request.headers.get("x-quick-view") == "1" or request.GET.get("drawer") == "1":
@@ -275,7 +609,7 @@ def thread_detail(request, slug, pk, thread_slug=None):
 @login_required
 def thread_edit(request, pk):
     thread = get_object_or_404(Thread.objects.select_related("community"), pk=pk)
-    if thread.author_id != request.user.pk:
+    if thread.author_id != request.user.pk or thread.community.get_sanction(request.user) is not None:
         raise PermissionDenied
     form = ThreadEditForm(request.POST or None, instance=thread)
     if request.method == "POST" and form.is_valid():
@@ -291,7 +625,8 @@ def thread_edit(request, pk):
 @require_POST
 def thread_delete(request, pk):
     thread = get_object_or_404(Thread.objects.select_related("community"), pk=pk)
-    if thread.author_id != request.user.pk and not thread.community.is_moderator(request.user):
+    is_mod = thread.community.is_moderator(request.user)
+    if not is_mod and (thread.author_id != request.user.pk or thread.community.is_banned(request.user)):
         raise PermissionDenied
     community = thread.community
     thread.delete()
@@ -305,13 +640,26 @@ def thread_moderate(request, pk, action):
     thread = get_object_or_404(Thread.objects.select_related("community"), pk=pk)
     if not thread.community.is_moderator(request.user):
         raise PermissionDenied
+    toast = ""
     if action == "pin":
         thread.is_pinned = not thread.is_pinned
-        messages.info(request, "Thread pinned." if thread.is_pinned else "Thread unpinned.")
+        toast = "Thread pinned." if thread.is_pinned else "Thread unpinned."
     elif action == "lock":
         thread.is_locked = not thread.is_locked
-        messages.info(request, "Thread locked." if thread.is_locked else "Thread unlocked.")
+        toast = "Thread locked." if thread.is_locked else "Thread unlocked."
     thread.save(update_fields=["is_pinned", "is_locked"])
+    if request.headers.get("x-live-action") == "1":
+        return JsonResponse(
+            {
+                "ok": True,
+                "toast": toast,
+                "thread_id": thread.pk,
+                "is_pinned": thread.is_pinned,
+                "is_locked": thread.is_locked,
+            }
+        )
+    if toast:
+        messages.info(request, toast)
     return redirect(thread)
 
 
@@ -320,6 +668,11 @@ def thread_moderate(request, pk, action):
 @ratelimit("vote", 120, 60)
 def thread_vote(request, pk):
     thread = get_object_or_404(Thread.objects.select_related("community"), pk=pk)
+    if thread.community.get_sanction(request.user) is not None:
+        if _is_ajax(request):
+            return JsonResponse({"error": "You cannot vote in this community."}, status=403)
+        messages.error(request, "You cannot vote in this community.")
+        return safe_next(request, thread.get_absolute_url())
     new = _apply_vote(ThreadVote, Thread, request.user, thread, "thread", request.POST.get("value"))
     thread.refresh_rank()
     if _is_ajax(request):
@@ -362,6 +715,17 @@ def _apply_vote(vote_model, target_model, user, obj, field, raw_value):
 @ratelimit("comment", 20, 300)
 def comment_create(request, pk):
     thread = get_object_or_404(Thread.objects.select_related("community"), pk=pk)
+    sanction = thread.community.get_sanction(request.user)
+    if sanction is not None:
+        msg = (
+            f"You are banned from c/{thread.community.slug}."
+            if sanction.kind == CommunitySanction.Kind.BAN
+            else f"You are in read-only mode in c/{thread.community.slug} and cannot comment."
+        )
+        if request.headers.get("x-live-action") == "1":
+            return JsonResponse({"ok": False, "error": msg}, status=403)
+        messages.error(request, msg)
+        return redirect(thread)
     if thread.is_locked:
         messages.error(request, "This thread is locked — new comments are disabled.")
         return redirect(thread)
@@ -400,7 +764,7 @@ def comment_create(request, pk):
 @login_required
 def comment_edit(request, pk):
     comment = get_object_or_404(Comment.objects.select_related("thread__community"), pk=pk, is_deleted=False)
-    if comment.author_id != request.user.pk:
+    if comment.author_id != request.user.pk or comment.thread.community.get_sanction(request.user) is not None:
         raise PermissionDenied
     form = CommentForm(request.POST or None, instance=comment)
     if request.method == "POST" and form.is_valid():
@@ -416,7 +780,8 @@ def comment_edit(request, pk):
 @require_POST
 def comment_delete(request, pk):
     comment = get_object_or_404(Comment.objects.select_related("thread__community"), pk=pk)
-    if comment.author_id != request.user.pk and not comment.thread.community.is_moderator(request.user):
+    is_mod = comment.thread.community.is_moderator(request.user)
+    if not is_mod and (comment.author_id != request.user.pk or comment.thread.community.is_banned(request.user)):
         raise PermissionDenied
     # Soft delete keeps reply chains readable.
     comment.is_deleted = True
@@ -433,6 +798,11 @@ def comment_delete(request, pk):
 @ratelimit("vote", 120, 60)
 def comment_vote(request, pk):
     comment = get_object_or_404(Comment.objects.select_related("thread__community"), pk=pk, is_deleted=False)
+    if comment.thread.community.get_sanction(request.user) is not None:
+        if _is_ajax(request):
+            return JsonResponse({"error": "You cannot vote in this community."}, status=403)
+        messages.error(request, "You cannot vote in this community.")
+        return safe_next(request, comment.get_absolute_url())
     new = _apply_vote(CommentVote, Comment, request.user, comment, "comment", request.POST.get("value"))
     if _is_ajax(request):
         return JsonResponse({"score": comment.score, "vote": new})

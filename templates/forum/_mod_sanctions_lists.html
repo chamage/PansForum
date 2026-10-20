@@ -1,0 +1,70 @@
+{% load forum_extras %}
+<div>
+  <h3 class="mod-subtitle">👻 Ghosted users ({{ ghosts|length }})</h3>
+  {% if ghosts %}
+    <ul class="mod-user-list">
+      {% for s in ghosts %}
+        <li class="mod-user-item">
+          <div class="mod-user-item__main">
+            {% avatar s.user "xs" %}
+            <div>
+              {% user_link s.user %}
+              <span class="tag">Ghosted</span>
+              {% if s.reason %}<div class="muted small">“{{ s.reason }}”</div>{% endif %}
+            </div>
+          </div>
+          <div class="mod-user-item__actions">
+            <form method="post" action="{% url 'forum:community_sanction_set' community.slug %}" class="inline" data-mod-action>
+              {% csrf_token %}
+              <input type="hidden" name="username" value="{{ s.user.username }}">
+              <input type="hidden" name="kind" value="ban">
+              <input type="hidden" name="reason" value="{{ s.reason }}">
+              <button type="submit" class="btn btn--ghost btn--sm" title="Upgrade to full ban">🚫 Ban</button>
+            </form>
+            <form method="post" action="{% url 'forum:community_sanction_remove' community.slug s.user.username %}" class="inline" data-mod-action>
+              {% csrf_token %}
+              <button type="submit" class="btn btn--ghost btn--sm">Un-ghost</button>
+            </form>
+          </div>
+        </li>
+      {% endfor %}
+    </ul>
+  {% else %}
+    <p class="muted small">No ghosted users.</p>
+  {% endif %}
+</div>
+
+<div>
+  <h3 class="mod-subtitle">🚫 Banned users ({{ bans|length }})</h3>
+  {% if bans %}
+    <ul class="mod-user-list">
+      {% for s in bans %}
+        <li class="mod-user-item">
+          <div class="mod-user-item__main">
+            {% avatar s.user "xs" %}
+            <div>
+              {% user_link s.user %}
+              <span class="tag tag--lock">Banned</span>
+              {% if s.reason %}<div class="muted small">“{{ s.reason }}”</div>{% endif %}
+            </div>
+          </div>
+          <div class="mod-user-item__actions">
+            <form method="post" action="{% url 'forum:community_sanction_set' community.slug %}" class="inline" data-mod-action>
+              {% csrf_token %}
+              <input type="hidden" name="username" value="{{ s.user.username }}">
+              <input type="hidden" name="kind" value="ghost">
+              <input type="hidden" name="reason" value="{{ s.reason }}">
+              <button type="submit" class="btn btn--ghost btn--sm" title="Switch to read-only ghost mode">👻 Ghost instead</button>
+            </form>
+            <form method="post" action="{% url 'forum:community_sanction_remove' community.slug s.user.username %}" class="inline" data-mod-action>
+              {% csrf_token %}
+              <button type="submit" class="btn btn--ghost btn--sm">Unban</button>
+            </form>
+          </div>
+        </li>
+      {% endfor %}
+    </ul>
+  {% else %}
+    <p class="muted small">No banned users.</p>
+  {% endif %}
+</div>

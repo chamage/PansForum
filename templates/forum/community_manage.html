@@ -1,0 +1,100 @@
+{% extends "base.html" %}
+{% load forum_extras %}
+{% block title %}Manage c/{{ community.slug }} · {{ SITE_NAME }}{% endblock %}
+{% block content %}
+<div class="layout" id="community-manage-shell" data-manage-community="{{ community.slug }}">
+  <section class="layout__main">
+    <a class="backlink" href="{{ community.get_absolute_url }}">← Back to c/{{ community.slug }}</a>
+
+    <header class="card community-hero">
+      <span class="community-dot community-dot--xl" aria-hidden="true">{{ community.name|first|upper }}</span>
+      <div class="community-hero__text">
+        <h1>Manage c/{{ community.slug }}</h1>
+        <span class="muted">Moderator tools · <span data-community-member-count="{{ community.slug }}">{{ community.member_count }} member{{ community.member_count|pluralize }}</span> · <span data-community-mod-count="{{ community.slug }}">{{ moderators|length }} moderator{{ moderators|length|pluralize }}</span></span>
+      </div>
+      <div class="community-hero__actions">
+        <a class="btn btn--ghost btn--sm" href="{{ community.get_absolute_url }}">View community</a>
+      </div>
+    </header>
+
+    <!-- 1. Ban & Ghost Users -->
+    <section class="card mod-section" id="mod-sanctions">
+      <div class="mod-section__head">
+        <h2>🚫 Ban &amp; 👻 Ghost users</h2>
+        <p class="muted small">
+          <strong>Ghost:</strong> User can still enter and read <code>c/{{ community.slug }}</code>, but cannot post threads, comment, or vote.<br>
+          <strong>Ban:</strong> User is completely blocked from entering or viewing <code>c/{{ community.slug }}</code> and its threads.
+        </p>
+      </div>
+
+      <form method="post" action="{% url 'forum:community_sanction_set' community.slug %}" class="mod-inline-form" data-mod-action>
+        {% csrf_token %}
+        <div class="mod-inline-form__row">
+          <div class="field">
+            <label for="sanction-username">Username</label>
+            <input id="sanction-username" type="text" name="username" required maxlength="30" placeholder="e.g. student123">
+          </div>
+          <div class="field">
+            <label for="sanction-kind">Restriction</label>
+            <select id="sanction-kind" name="kind">
+              <option value="ghost">👻 Ghost (can view, cannot interact)</option>
+              <option value="ban">🚫 Ban completely (cannot enter community)</option>
+            </select>
+          </div>
+          <div class="field mod-inline-form__grow">
+            <label for="sanction-reason">Reason (optional)</label>
+            <input id="sanction-reason" type="text" name="reason" maxlength="240" placeholder="Shown to user if banned…">
+          </div>
+          <div class="field mod-inline-form__btn">
+            <button type="submit" class="btn btn--primary">Apply</button>
+          </div>
+        </div>
+      </form>
+
+      <div class="mod-columns" id="mod-sanctions-region">
+        {% include "forum/_mod_sanctions_lists.html" %}
+      </div>
+    </section>
+
+    <!-- 2. Reported Posts & Comments -->
+    <section class="card mod-section" id="mod-reports-region">
+      {% include "forum/_mod_reports_list.html" %}
+    </section>
+
+    <!-- 3. Community Details -->
+    <section class="card mod-section" id="mod-details">
+      <div class="mod-section__head">
+        <h2>✏️ Community settings</h2>
+      </div>
+      <form method="post" novalidate>
+        {% csrf_token %}
+        {% include "components/form.html" %}
+        <div class="form-actions">
+          <button class="btn btn--primary" type="submit">Save changes</button>
+        </div>
+      </form>
+    </section>
+  </section>
+
+  <!-- Sidebar: Moderator Team Management -->
+  <aside class="layout__side">
+    <div class="card side-card" id="mod-team">
+      <h3>🛡 Moderator team</h3>
+      <p class="muted small">Moderators can pin, lock, or delete posts &amp; comments, and ghost or ban users in <code>c/{{ community.slug }}</code>.</p>
+
+      <ul class="mod-user-list mod-user-list--compact" id="mod-team-region">
+        {% include "forum/_mod_team_list.html" %}
+      </ul>
+
+      <form method="post" action="{% url 'forum:community_mod_add' community.slug %}" class="mod-add-form" data-mod-action>
+        {% csrf_token %}
+        <label class="small" for="add-mod-username"><strong>Add a moderator</strong></label>
+        <div class="mod-add-form__row">
+          <input id="add-mod-username" type="text" name="username" required maxlength="30" placeholder="Username…">
+          <button type="submit" class="btn btn--primary btn--sm">Add mod</button>
+        </div>
+      </form>
+    </div>
+  </aside>
+</div>
+{% endblock %}

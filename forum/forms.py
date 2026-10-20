@@ -3,9 +3,9 @@ import re
 from django import forms
 from django.utils.text import slugify
 
-from .models import Comment, Community, Report, Thread
+from .models import Comment, Community, CommunitySanction, Report, Thread
 
-RESERVED_SLUGS = {"new", "all", "admin", "edit", "submit", "join", "leave", "mod", "settings"}
+RESERVED_SLUGS = {"new", "all", "admin", "edit", "manage", "submit", "join", "leave", "mod", "mods", "sanctions", "reports", "settings"}
 
 
 class CommunityForm(forms.ModelForm):
@@ -48,9 +48,17 @@ class ThreadForm(forms.ModelForm):
         }
         labels = {"body": "Text"}
 
-    def __init__(self, *args, community=None, **kwargs):
+    def __init__(self, *args, community=None, user=None, **kwargs):
         super().__init__(*args, **kwargs)
-        self.fields["community"].queryset = Community.objects.order_by("name")
+        qs = Community.objects.order_by("name")
+        if user and user.is_authenticated and not user.is_staff:
+            restricted_ids = (
+                CommunitySanction.objects.filter(user=user)
+                .exclude(community__moderators=user)
+                .values_list("community_id", flat=True)
+            )
+            qs = qs.exclude(pk__in=restricted_ids)
+        self.fields["community"].queryset = qs
         self.fields["community"].empty_label = "Choose a community…"
         if community is not None:
             del self.fields["community"]

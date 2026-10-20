@@ -15,7 +15,7 @@
   <div class="comment__actions">
     {% include "forum/_vote.html" with kind="comment" obj=comment vote=comment_votes|get_item:comment.pk inline=True %}
     {% if user.is_authenticated %}
-      {% if comment.can_reply and not thread.is_locked %}
+      {% if comment.can_reply and not thread.is_locked and not is_ghosted %}
         <details class="reply">
           <summary class="action">Reply</summary>
           <form method="post" action="{% url 'forum:comment_create' thread.pk %}" class="comment-form comment-form--reply">
@@ -27,13 +27,34 @@
           </form>
         </details>
       {% endif %}
-      {% if comment.author_id == user.pk %}
+      {% if comment.author_id == user.pk and not is_ghosted %}
         <a class="action" href="{% url 'forum:comment_edit' comment.pk %}">Edit</a>
       {% endif %}
       {% if comment.author_id == user.pk or is_mod %}
         <form method="post" action="{% url 'forum:comment_delete' comment.pk %}" class="inline" data-confirm="Delete this comment?" data-comment-delete>
           {% csrf_token %}<button type="submit" class="action action--danger">Delete</button>
         </form>
+      {% endif %}
+      {% if is_mod and comment.author and comment.author_id != user.pk and comment.author_id not in mod_ids %}
+        {% with author_sanction=sanctioned_map|get_item:comment.author_id %}
+          {% if author_sanction == 'ghost' %}
+            <form method="post" action="{% url 'forum:community_sanction_remove' thread.community.slug comment.author.username %}" class="inline" data-mod-action>
+              {% csrf_token %}<input type="hidden" name="next" value="{{ comment.get_absolute_url }}">
+              <button type="submit" class="action">👻 Un-ghost</button>
+            </form>
+          {% else %}
+            <form method="post" action="{% url 'forum:community_sanction_set' thread.community.slug %}" class="inline" data-mod-action data-confirm="Ghost @{{ comment.author.username }} in c/{{ thread.community.slug }}? They will still be able to view the community, but won't be able to post, comment, or vote.">
+              {% csrf_token %}<input type="hidden" name="username" value="{{ comment.author.username }}"><input type="hidden" name="kind" value="ghost"><input type="hidden" name="next" value="{{ comment.get_absolute_url }}">
+              <button type="submit" class="action">👻 Ghost</button>
+            </form>
+          {% endif %}
+          {% if author_sanction != 'ban' %}
+            <form method="post" action="{% url 'forum:community_sanction_set' thread.community.slug %}" class="inline" data-mod-action data-confirm="Ban @{{ comment.author.username }} completely from c/{{ thread.community.slug }}?">
+              {% csrf_token %}<input type="hidden" name="username" value="{{ comment.author.username }}"><input type="hidden" name="kind" value="ban"><input type="hidden" name="next" value="{{ comment.get_absolute_url }}">
+              <button type="submit" class="action action--danger">🚫 Ban</button>
+            </form>
+          {% endif %}
+        {% endwith %}
       {% endif %}
       {% if comment.author_id != user.pk %}
         <a class="action" href="{% url 'forum:comment_report' comment.pk %}">Report</a>

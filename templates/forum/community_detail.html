@@ -10,18 +10,28 @@
     <span class="muted">c/{{ community.slug }} · <span data-community-member-count="{{ community.slug }}">{{ community.member_count }} member{{ community.member_count|pluralize }}</span></span>
   </div>
   <div class="community-hero__actions">
-    {% include "forum/_join_button.html" %}
-    {% if is_mod %}<a class="btn btn--ghost btn--sm" href="{% url 'forum:community_edit' community.slug %}">Edit</a>{% endif %}
+    <span data-join-slot="{{ community.slug }}">{% if not is_ghosted %}{% include "forum/_join_button.html" %}{% endif %}</span>
+    {% if is_mod %}
+      <a class="btn btn--ghost btn--sm" href="{% url 'forum:community_manage' community.slug %}">
+        🛡 Manage community <span class="badge" data-community-reports-badge {% if not open_reports_count %}hidden{% endif %}>{% if open_reports_count %}{{ open_reports_count }}{% endif %}</span>
+      </a>
+    {% endif %}
   </div>
 </header>
 
 <div class="layout">
   <section class="layout__main">
-    <div class="feed-head">
-      <a class="composer card" href="{% url 'forum:community_submit' community.slug %}">
-        {% if user.is_authenticated %}{% avatar user "sm" %}{% endif %}
-        <span class="composer__fake">Start a thread in c/{{ community.slug }}…</span>
-      </a>
+    <div class="feed-head" id="community-composer-slot" data-ghost-state="{% if is_ghosted %}1{% else %}0{% endif %}">
+      {% if is_ghosted %}
+        <div class="alert alert--info">
+          👻 You are in read-only mode in <strong>c/{{ community.slug }}</strong>. You can view posts and comments, but cannot post, reply, or vote.
+        </div>
+      {% else %}
+        <a class="composer card" href="{% url 'forum:community_submit' community.slug %}">
+          {% if user.is_authenticated %}{% avatar user "sm" %}{% endif %}
+          <span class="composer__fake">Start a thread in c/{{ community.slug }}…</span>
+        </a>
+      {% endif %}
     </div>
     <div class="feed-head">{% include "forum/_sort_tabs.html" %}</div>
 
@@ -43,15 +53,23 @@
   <aside class="layout__side">
     <div class="card side-card">
       <h3>About</h3>
-      <p>{{ community.description|default:"No description yet."|linebreaksbr }}</p>
+      <p data-community-description="{{ community.slug }}">{{ community.description|default:"No description yet."|linebreaksbr }}</p>
       <p class="muted small">Created {{ community.created_at|date:"M j, Y" }}</p>
     </div>
     {% if moderators %}
       <div class="card side-card">
         <h3>Moderators</h3>
-        <ul class="people-mini">
-          {% for mod in moderators %}<li>{% avatar mod "xs" %} {% user_link mod %}</li>{% endfor %}
+        <ul class="people-mini" id="community-mods-list">
+          {% for mod in moderators %}
+            <li>
+              {% avatar mod "xs" %} {% user_link mod %}
+              {% if community.created_by_id == mod.pk %}<span class="tag tag--pin">Founder</span>{% endif %}
+            </li>
+          {% endfor %}
         </ul>
+        {% if is_mod %}
+          <a class="side-card__more" href="{% url 'forum:community_manage' community.slug %}">Manage community →</a>
+        {% endif %}
       </div>
     {% endif %}
   </aside>

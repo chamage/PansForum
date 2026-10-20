@@ -521,13 +521,20 @@
         params.set("friends_page", "1");
       }
 
-      // 3. Profile page friend actions state
+      // 3. Profile page friend actions & stats state
       const profileActions = document.querySelector("[data-profile-actions]");
-      if (profileActions && profileActions.dataset.profileUsername) {
-        params.set("profile_user", profileActions.dataset.profileUsername);
+      const profileUsername = profileActions
+        ? profileActions.dataset.profileUsername || profileActions.dataset.profileActions || ""
+        : "";
+      const profileFriendsGrid = document.getElementById("profile-friends-grid");
+      if (profileUsername) {
+        params.set("profile_user", profileUsername);
+        if (profileFriendsGrid) {
+          params.set("profile_friends_grid", "1");
+        }
       }
 
-      // 4. Visible thread IDs (for live score, comment count, title & deletion sync)
+      // 4. Visible thread IDs (for live score, comment count, title, excerpt & deletion sync)
       const threadIdSet = new Set();
       document.querySelectorAll("[data-thread-id], [data-thread-card]").forEach((el) => {
         const tid = el.dataset.threadId || el.dataset.threadCard;
@@ -537,14 +544,41 @@
         params.set("thread_ids", Array.from(threadIdSet).slice(0, 40).join(","));
       }
 
-      // 5. Feed list (for live new threads appearing at top of home or community feed)
+      // 4b. Visible community slugs (for live member counts in cards & sidebars)
+      const commSlugSet = new Set();
+      document.querySelectorAll("[data-community-member-count], [data-community-count]").forEach((el) => {
+        const s = el.dataset.communityMemberCount || el.dataset.communityCount;
+        if (s) commSlugSet.add(s);
+      });
+      if (commSlugSet.size > 0) {
+        params.set("community_slugs", Array.from(commSlugSet).slice(0, 30).join(","));
+      }
+
+      // 4c. Communities directory grid (/communities/)
+      const communitiesGrid = document.getElementById("communities-live-grid");
+      if (communitiesGrid) {
+        params.set("communities_grid", "1");
+        params.set("communities_sig", forceUpdate ? "force" : communitiesGrid.dataset.communitiesSig || "init");
+      }
+
+      // 4d. Community Management Dashboard (/c/<slug>/manage/)
+      const manageShell = document.getElementById("community-manage-shell");
+      if (manageShell && manageShell.dataset.manageCommunity) {
+        params.set("manage_community", manageShell.dataset.manageCommunity);
+      }
+
+      // 5. Feed list (for live new threads appearing at top of home, community, or profile feed)
       const feedList = document.getElementById("feed-list");
       if (feedList) {
         const feedPage = feedList.dataset.livePage || feedList.dataset.page || "1";
         const feedType = feedList.dataset.liveFeed || feedList.dataset.feed || "all";
         const feedComm = feedList.dataset.liveCommunity || feedList.dataset.community || "";
+        const feedProf = feedList.dataset.liveProfile || "";
         if (feedComm) {
           params.set("community", feedComm);
+        }
+        if (feedProf) {
+          params.set("feed_profile", feedProf);
         }
         if (feedPage === "1") {
           params.set("feed", feedType);
@@ -663,7 +697,7 @@
         }
       }
 
-      // D. Update profile friend actions & friend counter
+      // D. Update profile friend actions, counters & friends grid
       if (profileActions && typeof data.profile_actions_html === "string") {
         if (profileActions.innerHTML !== data.profile_actions_html) {
           profileActions.innerHTML = data.profile_actions_html;
@@ -671,13 +705,41 @@
         if (typeof data.profile_friends_count === "number") {
           const statEl = document.querySelector("[data-profile-friends-stat]");
           if (statEl) {
-            statEl.textContent =
-              data.profile_friends_count + " " + pluralize(data.profile_friends_count, "friend", "friends");
+            statEl.innerHTML =
+              "<strong>" +
+              data.profile_friends_count +
+              "</strong> " +
+              pluralize(data.profile_friends_count, "friend", "friends");
+          }
+        }
+        if (typeof data.profile_threads_count === "number") {
+          const tStatEl = document.querySelector("[data-profile-threads-stat]");
+          if (tStatEl) {
+            tStatEl.innerHTML =
+              "<strong>" +
+              data.profile_threads_count +
+              "</strong> " +
+              pluralize(data.profile_threads_count, "thread", "threads");
+          }
+        }
+        if (typeof data.profile_comments_count === "number") {
+          const cStatEl = document.querySelector("[data-profile-comments-stat]");
+          if (cStatEl) {
+            cStatEl.innerHTML =
+              "<strong>" +
+              data.profile_comments_count +
+              "</strong> " +
+              pluralize(data.profile_comments_count, "comment", "comments");
+          }
+        }
+        if (profileFriendsGrid && typeof data.profile_friends_grid_html === "string") {
+          if (profileFriendsGrid.innerHTML !== data.profile_friends_grid_html) {
+            profileFriendsGrid.innerHTML = data.profile_friends_grid_html;
           }
         }
       }
 
-      // E. Update visible thread scores, comment counts, titles & remove deleted threads
+      // E. Update visible thread scores, comment counts, titles, excerpts, pin/lock tags & remove deleted threads
       if (data.threads) {
         Object.keys(data.threads).forEach((tid) => {
           const info = data.threads[tid];
@@ -692,6 +754,40 @@
               if (el.textContent !== info.title) el.textContent = info.title;
             });
           }
+          if (typeof info.excerpt === "string") {
+            document.querySelectorAll(`[data-thread-excerpt="${tid}"]`).forEach((el) => {
+              el.textContent = info.excerpt;
+              el.hidden = !info.excerpt;
+            });
+          }
+          if (typeof info.is_edited === "boolean") {
+            document.querySelectorAll(`[data-thread-edited="${tid}"]`).forEach((el) => {
+              el.hidden = !info.is_edited;
+            });
+          }
+          if (typeof info.is_pinned === "boolean") {
+            document.querySelectorAll(`[data-thread-pin-tag="${tid}"]`).forEach((el) => {
+              el.hidden = !info.is_pinned;
+            });
+            document.querySelectorAll(`[data-thread-pin-btn="${tid}"]`).forEach((el) => {
+              el.textContent = info.is_pinned ? "Unpin" : "Pin";
+            });
+            document
+              .querySelectorAll(`.thread-card[data-thread-id="${tid}"], .thread-card[data-thread-card="${tid}"]`)
+              .forEach((card) => {
+                if (card.querySelector(`[data-thread-pin-tag="${tid}"]`)) {
+                  card.classList.toggle("is-pinned", info.is_pinned);
+                }
+              });
+          }
+          if (typeof info.is_locked === "boolean") {
+            document.querySelectorAll(`[data-thread-lock-tag="${tid}"]`).forEach((el) => {
+              el.hidden = !info.is_locked;
+            });
+            document.querySelectorAll(`[data-thread-lock-btn="${tid}"]`).forEach((el) => {
+              el.textContent = info.is_locked ? "Unlock" : "Lock";
+            });
+          }
         });
       }
 
@@ -703,14 +799,88 @@
         });
       }
 
-      if (data.community_info && data.community_info.slug) {
-        const mc = data.community_info.member_count;
-        document.querySelectorAll(`[data-community-member-count="${data.community_info.slug}"]`).forEach((el) => {
-          el.textContent = mc + " " + pluralize(mc, "member", "members");
+      // E2. Update community member counts across cards & sidebars
+      if (data.communities_counts) {
+        Object.keys(data.communities_counts).forEach((slug) => {
+          const mc = data.communities_counts[slug];
+          document.querySelectorAll(`[data-community-member-count="${slug}"]`).forEach((el) => {
+            el.textContent = mc + " " + pluralize(mc, "member", "members");
+          });
+          document.querySelectorAll(`[data-community-count="${slug}"]`).forEach((el) => {
+            el.textContent = String(mc);
+          });
         });
       }
 
-      // F. Prepend new threads to feed (home or community)
+      // E3. Update /communities/ directory grid
+      if (communitiesGrid && data.communities_sig) {
+        communitiesGrid.dataset.communitiesSig = data.communities_sig;
+        if (typeof data.communities_grid_html === "string") {
+          communitiesGrid.innerHTML = data.communities_grid_html;
+        }
+      }
+
+      // E4. Update active community detail page
+      if (data.community_info && data.community_info.slug) {
+        if (data.community_info.is_banned) {
+          window.location.reload();
+          return;
+        }
+        const slug = data.community_info.slug;
+        const mc = data.community_info.member_count;
+        document.querySelectorAll(`[data-community-member-count="${slug}"]`).forEach((el) => {
+          el.textContent = mc + " " + pluralize(mc, "member", "members");
+        });
+        if (typeof data.community_info.description === "string") {
+          document.querySelectorAll(`[data-community-description="${slug}"]`).forEach((el) => {
+            if (el.textContent !== data.community_info.description) {
+              el.textContent = data.community_info.description;
+            }
+          });
+        }
+        if (typeof data.community_info.open_reports_count === "number") {
+          setBadgeCount("[data-community-reports-badge]", data.community_info.open_reports_count);
+        }
+        const compSlot = document.getElementById("community-composer-slot");
+        if (compSlot) {
+          const newGhostState = data.community_info.is_ghosted ? "1" : "0";
+          if (compSlot.dataset.ghostState && compSlot.dataset.ghostState !== newGhostState) {
+            window.location.reload();
+            return;
+          }
+        }
+      }
+
+      // E5. Update Community Management Dashboard (/c/<slug>/manage/)
+      if (data.manage && manageShell) {
+        const mSlug = data.manage.slug;
+        if (typeof data.manage.member_count === "number") {
+          document.querySelectorAll(`[data-community-member-count="${mSlug}"]`).forEach((el) => {
+            el.textContent =
+              data.manage.member_count + " " + pluralize(data.manage.member_count, "member", "members");
+          });
+        }
+        if (typeof data.manage.mod_count === "number") {
+          document.querySelectorAll(`[data-community-mod-count="${mSlug}"]`).forEach((el) => {
+            el.textContent =
+              data.manage.mod_count + " " + pluralize(data.manage.mod_count, "moderator", "moderators");
+          });
+        }
+        const sancRegion = document.getElementById("mod-sanctions-region");
+        if (sancRegion && typeof data.manage.sanctions_html === "string" && sancRegion.innerHTML !== data.manage.sanctions_html) {
+          sancRegion.innerHTML = data.manage.sanctions_html;
+        }
+        const repRegion = document.getElementById("mod-reports-region");
+        if (repRegion && typeof data.manage.reports_html === "string" && repRegion.innerHTML !== data.manage.reports_html) {
+          repRegion.innerHTML = data.manage.reports_html;
+        }
+        const teamRegion = document.getElementById("mod-team-region");
+        if (teamRegion && typeof data.manage.team_html === "string" && teamRegion.innerHTML !== data.manage.team_html) {
+          teamRegion.innerHTML = data.manage.team_html;
+        }
+      }
+
+      // F. Prepend new threads to feed (home, community, or profile)
       if (feedList && data.new_threads_html) {
         const temp = document.createElement("div");
         temp.innerHTML = data.new_threads_html;
@@ -733,16 +903,63 @@
         });
       }
 
-      // G. Update open thread comments
+      // G. Update open thread state & comments
+      if (data.open_thread_deleted || data.open_thread_banned) {
+        if (drawer && !drawer.hidden) {
+          closeDrawer();
+          if (data.open_thread_deleted) showToast("This thread was deleted.", "info");
+        } else {
+          window.location.reload();
+        }
+        return;
+      }
+
+      if (data.open_thread_meta) {
+        const tm = data.open_thread_meta;
+        document.querySelectorAll(`[data-thread-body="${tm.id}"]`).forEach((el) => {
+          el.hidden = !tm.has_body;
+          if (tm.has_body && el.innerHTML !== tm.body_html) {
+            el.innerHTML = tm.body_html;
+          }
+        });
+        const boxSlot = document.getElementById("thread-comment-box-slot");
+        if (boxSlot && boxSlot.dataset.boxState && boxSlot.dataset.boxState !== tm.box_state) {
+          boxSlot.dataset.boxState = tm.box_state;
+          if (tm.box_state === "ghost") {
+            boxSlot.innerHTML = `<div class="alert alert--info">👻 You are in read-only mode in <strong>c/${tm.community_slug}</strong>. You can read posts and comments, but cannot reply or vote.</div>`;
+          } else if (tm.box_state === "locked") {
+            boxSlot.innerHTML = `<div class="alert alert--info">🔒 This thread is locked. You can read it, but new comments are turned off.</div>`;
+          } else if (drawer && !drawer.hidden && activeDrawerUrl) {
+            openDrawer(activeDrawerUrl);
+          } else {
+            window.location.reload();
+          }
+        }
+      }
+
+      if (data.comment_scores) {
+        Object.keys(data.comment_scores).forEach((cid) => {
+          const sc = data.comment_scores[cid];
+          document.querySelectorAll(`form[data-vote-form][action="/comment/${cid}/vote/"] [data-score]`).forEach((el) => {
+            el.textContent = sc;
+          });
+          document.querySelectorAll(`[data-comment-points="${cid}"]`).forEach((el) => {
+            el.textContent = sc + " " + pluralize(sc, "point", "points");
+          });
+        });
+      }
+
       if (activeCommentsEl && data.comments_sig) {
         if (typeof data.comments_html === "string") {
           const activeEl = document.activeElement;
+          const hasOpenReply = Boolean(activeCommentsEl.querySelector("details.reply[open]"));
           const isTypingInComments =
             !forceUpdate &&
-            activeEl &&
-            activeEl.tagName === "TEXTAREA" &&
-            activeCommentsEl.contains(activeEl) &&
-            activeEl.value.trim().length > 0;
+            (hasOpenReply ||
+              (activeEl &&
+                activeEl.tagName === "TEXTAREA" &&
+                activeCommentsEl.contains(activeEl) &&
+                activeEl.value.trim().length > 0));
 
           if (!isTypingInComments) {
             activeCommentsEl.innerHTML = data.comments_html;
@@ -991,6 +1208,85 @@
           await pollLiveState(true);
           return;
         }
+      } catch (_) {
+        form.submit();
+      }
+      return;
+    }
+
+    // 6. Live Community Join / Leave
+    if (form.hasAttribute("data-community-join-form")) {
+      e.preventDefault();
+      const body = new URLSearchParams(new FormData(form));
+      try {
+        const resp = await fetch(form.action, {
+          method: "POST",
+          headers: {
+            "X-CSRFToken": csrfToken,
+            "X-Live-Action": "1",
+            "X-Requested-With": "XMLHttpRequest",
+            "Content-Type": "application/x-www-form-urlencoded",
+          },
+          body: body.toString(),
+          credentials: "same-origin",
+        });
+        const data = await resp.json();
+        if (!resp.ok || !data.ok) {
+          if (data && data.error) showToast(data.error, "error");
+          return;
+        }
+        if (data.slug && data.join_html) {
+          document.querySelectorAll(`[data-join-slot="${data.slug}"]`).forEach((slot) => {
+            slot.innerHTML = data.join_html;
+          });
+        }
+        if (data.slug && typeof data.member_count === "number") {
+          document.querySelectorAll(`[data-community-member-count="${data.slug}"]`).forEach((el) => {
+            el.textContent = data.member_count + " " + pluralize(data.member_count, "member", "members");
+          });
+          document.querySelectorAll(`[data-community-count="${data.slug}"]`).forEach((el) => {
+            el.textContent = String(data.member_count);
+          });
+        }
+        await pollLiveState(true);
+      } catch (_) {
+        form.submit();
+      }
+      return;
+    }
+
+    // 7. Live Moderator Actions (Pin, Lock, Ban, Ghost, Un-ghost, Unban, Mod Team, Reports)
+    if (form.hasAttribute("data-mod-action")) {
+      e.preventDefault();
+      const body = new URLSearchParams(new FormData(form));
+      try {
+        const resp = await fetch(form.action, {
+          method: "POST",
+          headers: {
+            "X-CSRFToken": csrfToken,
+            "X-Live-Action": "1",
+            "X-Requested-With": "XMLHttpRequest",
+            "Content-Type": "application/x-www-form-urlencoded",
+          },
+          body: body.toString(),
+          credentials: "same-origin",
+        });
+        const data = await resp.json();
+        if (!resp.ok || !data.ok) {
+          if (data && (data.error || data.toast)) showToast(data.error || data.toast, "error");
+          return;
+        }
+        if (data.redirect) {
+          window.location.href = data.redirect;
+          return;
+        }
+        form.querySelectorAll("input[type='text']").forEach((inp) => {
+          inp.value = "";
+        });
+        if (data.toast) {
+          showToast(data.toast, "info");
+        }
+        await pollLiveState(true);
       } catch (_) {
         form.submit();
       }

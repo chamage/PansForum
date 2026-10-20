@@ -1,0 +1,20 @@
+{% load forum_extras %}
+{% for mod in moderators %}
+  <li class="mod-user-item">
+    <div class="mod-user-item__main">
+      {% avatar mod "xs" %}
+      <div>
+        {% user_link mod %}
+        {% if community.created_by_id == mod.pk %}
+          <span class="tag tag--pin" title="Community creator">Founder</span>
+        {% endif %}
+      </div>
+    </div>
+    {% if community.created_by_id != mod.pk %}
+      <form method="post" action="{% url 'forum:community_mod_remove' community.slug mod.username %}" class="inline" data-mod-action data-confirm="Remove @{{ mod.username }} from the moderator team?">
+        {% csrf_token %}
+        <button type="submit" class="btn btn--ghost btn--sm">Remove</button>
+      </form>
+    {% endif %}
+  </li>
+{% endfor %}

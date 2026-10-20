@@ -158,4 +158,90 @@ class ForumTests(TestCase):
         self.assertIn("Live thread", data["new_threads_html"])
         self.assertIn("Real-time comment!", data["comments_html"])
 
+    def test_community_moderation_ban_ghost_and_mod_team(self):
+        charlie = User.objects.create_user(
+            username="charlie", email="charlie@student.pans.edu", password=self.password
+        )
+        thread = Thread.objects.create(
+            community=self.community, author=self.bob, title="Bob's thread", body="Hello"
+        )
+        comment = Comment.objects.create(thread=thread, author=self.bob, body="Bob's comment")
+
+        # 1. Alice (founder/mod) adds Charlie to the moderator team
+        self.client.force_login(self.alice)
+        self.client.post(
+            reverse("forum:community_mod_add", args=[self.community.slug]),
+            {"username": "charlie"},
+        )
+        self.assertTrue(self.community.is_moderator(charlie))
+
+        # Charlie cannot remove Alice (the community founder)
+        self.client.force_login(charlie)
+        self.client.post(
+            reverse("forum:community_mod_remove", args=[self.community.slug, self.alice.username])
+        )
+        self.assertTrue(self.community.is_moderator(self.alice))
+
+        # 2. Ghosting Bob: Bob CAN view the community & thread, but CANNOT post, comment, or vote
+        self.client.post(
+            reverse("forum:community_sanction_set", args=[self.community.slug]),
+            {"username": "bob", "kind": "ghost", "reason": "Spamming comments"},
+        )
+        self.assertTrue(self.community.is_ghosted(self.bob))
+
+        self.client.force_login(self.bob)
+        self.assertEqual(self.client.get(self.community.get_absolute_url()).status_code, 200)
+        self.assertEqual(self.client.get(thread.get_absolute_url()).status_code, 200)
+
+        # Ghosted Bob tries to post a thread, comment, and vote -> all blocked
+        self.client.post(
+            reverse("forum:community_submit", args=[self.community.slug]),
+            {"title": "Should not be created", "body": "Blocked"},
+        )
+        self.assertEqual(Thread.objects.count(), 1)
+
+        c_resp = self.client.post(
+            reverse("forum:comment_create", args=[thread.pk]),
+            {"body": "Ghosted comment attempt"},
+            HTTP_X_LIVE_ACTION="1",
+        )
+        self.assertEqual(c_resp.status_code, 403)
+        self.assertEqual(Comment.objects.count(), 1)
+
+        v_resp = self.client.post(
+            reverse("forum:thread_vote", args=[thread.pk]),
+            {"value": "1"},
+            HTTP_X_REQUESTED_WITH="XMLHttpRequest",
+        )
+        self.assertEqual(v_resp.status_code, 403)
+
+        # 3. Banning Bob completely: Bob CANNOT enter the community or view its threads
+        self.client.force_login(self.alice)
+        self.client.post(
+            reverse("forum:community_sanction_set", args=[self.community.slug]),
+            {"username": "bob", "kind": "ban", "reason": "Repeated rule violations"},
+        )
+        self.assertTrue(self.community.is_banned(self.bob))
+
+        self.client.force_login(self.bob)
+        comm_resp = self.client.get(self.community.get_absolute_url())
+        self.assertEqual(comm_resp.status_code, 403)
+        self.assertContains(comm_resp, "Repeated rule violations", status_code=403)
+        self.assertEqual(self.client.get(thread.get_absolute_url()).status_code, 403)
+
+        # 4. Moderator can unban Bob and delete comments/threads
+        self.client.force_login(charlie)
+        self.client.post(reverse("forum:comment_delete", args=[comment.pk]))
+        comment.refresh_from_db()
+        self.assertTrue(comment.is_deleted)
+
+        self.client.post(reverse("forum:thread_delete", args=[thread.pk]))
+        self.assertEqual(Thread.objects.filter(pk=thread.pk).count(), 0)
+
+        self.client.post(
+            reverse("forum:community_sanction_remove", args=[self.community.slug, self.bob.username])
+        )
+        self.client.force_login(self.bob)
+        self.assertEqual(self.client.get(self.community.get_absolute_url()).status_code, 200)
+
 
