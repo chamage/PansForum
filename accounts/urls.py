@@ -33,6 +33,8 @@ urlpatterns = [
     path("friends/<int:pk>/decline/", views.friend_decline, name="friend_decline"),
     # Chat / Direct Messages
     path("messages/", views.chat_inbox, name="chat_inbox"),
+    path("messages/dock/", views.chat_dock, name="chat_dock"),
+    path("messages/dock/<str:username>/", views.chat_dock, name="chat_dock_thread"),
     path("messages/<int:pk>/accept/", views.chat_accept, name="chat_accept"),
     path("messages/<int:pk>/ignore/", views.chat_ignore, name="chat_ignore"),
     path("messages/m/<int:pk>/edit/", views.chat_message_edit, name="chat_message_edit"),

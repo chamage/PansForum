@@ -349,6 +349,15 @@ class AccountsTests(TestCase):
         self.assertTrue(latest_msg.is_deleted)
         self.assertEqual(latest_msg.body, "")
 
+        # 6. Floating Quick-Chat Dock renders both conversation list and partner thread
+        dock_list = self.client.get(reverse("accounts:chat_dock"))
+        self.assertEqual(dock_list.status_code, 200)
+        self.assertContains(dock_list, "Quick Chat")
+
+        dock_thread = self.client.get(reverse("accounts:chat_dock_thread", args=[self.bob.username]))
+        self.assertEqual(dock_thread.status_code, 200)
+        self.assertContains(dock_thread, "This message was deleted.")
+
 
 
 

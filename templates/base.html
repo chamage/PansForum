@@ -80,5 +80,18 @@
 
   <div id="quick-backdrop" class="drawer-backdrop" data-drawer-close hidden></div>
   <aside id="quick-drawer" class="drawer" role="dialog" aria-modal="true" aria-label="Thread quick view" hidden></aside>
+
+  {% block chat_dock %}
+    {% if user.is_authenticated %}
+      <div class="chat-dock" id="chat-dock" data-dock-endpoint="{% url 'accounts:chat_dock' %}">
+        <section class="chat-dock__panel card" id="chat-dock-panel" role="region" aria-label="Quick chat" hidden></section>
+        <button type="button" class="chat-dock__launcher" id="chat-dock-launcher" data-dock-toggle aria-expanded="false" aria-controls="chat-dock-panel">
+          <span class="chat-dock__launcher-icon" aria-hidden="true">💬</span>
+          <span class="chat-dock__launcher-label">Chat</span>
+          <span class="badge" data-live-messages-badge {% if not unread_messages_count %}hidden{% endif %}>{% if unread_messages_count %}{{ unread_messages_count }}{% endif %}</span>
+        </button>
+      </div>
+    {% endif %}
+  {% endblock %}
 </body>
 </html>

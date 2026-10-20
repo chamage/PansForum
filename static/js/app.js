@@ -11,6 +11,80 @@
   let activeDrawerUrl = null;
   let lastTriggerEl = null;
 
+  const chatDock = document.getElementById("chat-dock");
+  const chatDockPanel = document.getElementById("chat-dock-panel");
+  const chatDockLauncher = document.getElementById("chat-dock-launcher");
+
+  // --------------------------------------------------------------------------
+  // Floating Quick-Chat Dock (Messenger / Reddit style popup)
+  // --------------------------------------------------------------------------
+  function toDockUrl(href) {
+    if (!href) return "/messages/dock/";
+    if (href.indexOf("/messages/dock/") === 0) return href;
+    if (href.indexOf("/messages/?") === 0) {
+      return "/messages/dock/" + href.slice("/messages/".length);
+    }
+    if (href === "/messages/" || href === "/messages") {
+      return "/messages/dock/";
+    }
+    if (href.indexOf("/messages/") === 0) {
+      return "/messages/dock/" + href.slice("/messages/".length);
+    }
+    return href;
+  }
+
+  async function openChatDock(url, skipFocus) {
+    if (!chatDock || !chatDockPanel) return;
+    const dockUrl = toDockUrl(url || sessionStorage.getItem("pans_dock_url") || "/messages/dock/");
+    chatDockPanel.hidden = false;
+    if (chatDockLauncher) chatDockLauncher.setAttribute("aria-expanded", "true");
+    try {
+      sessionStorage.setItem("pans_dock_open", "1");
+      sessionStorage.setItem("pans_dock_url", dockUrl);
+    } catch (_) {}
+
+    if (!chatDockPanel.innerHTML.trim()) {
+      chatDockPanel.innerHTML =
+        '<div class="chat-dock__inner"><header class="chat-dock__head"><span class="chat-dock__title">💬 Quick Chat</span>' +
+        '<button type="button" class="btn btn--ghost btn--sm" data-dock-close aria-label="Minimize chat">—</button></header>' +
+        '<div class="chat-dock__body"><div class="chat-list__empty muted small">Loading chat…</div></div></div>';
+    }
+
+    try {
+      const resp = await fetch(dockUrl, {
+        headers: { "X-Requested-With": "XMLHttpRequest" },
+        credentials: "same-origin",
+      });
+      if (!resp.ok) return;
+      chatDockPanel.innerHTML = await resp.text();
+      const logEl = chatDockPanel.querySelector("#chat-log");
+      if (logEl) logEl.scrollTop = logEl.scrollHeight;
+      if (!skipFocus) {
+        const ta = chatDockPanel.querySelector(".chat-form textarea");
+        if (ta) ta.focus();
+      }
+      pollLiveState(false);
+    } catch (_) {}
+  }
+
+  function closeChatDock() {
+    if (!chatDockPanel) return;
+    chatDockPanel.hidden = true;
+    chatDockPanel.innerHTML = "";
+    if (chatDockLauncher) chatDockLauncher.setAttribute("aria-expanded", "false");
+    try {
+      sessionStorage.setItem("pans_dock_open", "0");
+    } catch (_) {}
+  }
+
+  if (chatDock && chatDockPanel) {
+    try {
+      if (sessionStorage.getItem("pans_dock_open") === "1") {
+        openChatDock(sessionStorage.getItem("pans_dock_url") || "/messages/dock/", true);
+      }
+    } catch (_) {}
+  }
+
   // --------------------------------------------------------------------------
   // Toast helper for live notifications
   // --------------------------------------------------------------------------
@@ -210,6 +284,42 @@
         if (contentEl) contentEl.hidden = false;
       }
       return;
+    }
+
+    // 4b. Floating Quick-Chat Dock controls & internal navigation
+    const dockToggleBtn = e.target.closest("[data-dock-toggle]");
+    if (dockToggleBtn) {
+      e.preventDefault();
+      if (chatDockPanel && !chatDockPanel.hidden) {
+        closeChatDock();
+      } else {
+        openChatDock();
+      }
+      return;
+    }
+
+    if (e.target.closest("[data-dock-close]")) {
+      e.preventDefault();
+      closeChatDock();
+      return;
+    }
+
+    const dockUrlBtn = e.target.closest("[data-dock-url]");
+    if (dockUrlBtn) {
+      e.preventDefault();
+      openChatDock(dockUrlBtn.getAttribute("data-dock-url"));
+      return;
+    }
+
+    if (chatDockPanel && chatDockPanel.contains(e.target)) {
+      const dockChatLink = e.target.closest('a[href^="/messages/"]');
+      if (dockChatLink && !dockChatLink.hasAttribute("data-dock-full")) {
+        if (!e.metaKey && !e.ctrlKey && !e.shiftKey && !e.altKey && e.button === 0) {
+          e.preventDefault();
+          openChatDock(dockChatLink.getAttribute("href"));
+          return;
+        }
+      }
     }
 
     // 5. Close quick-view drawer
@@ -632,9 +742,8 @@
     prevUnreadMessages = parseInt(initMsgsBadge.textContent, 10) || 0;
   }
 
-  // Poll every 1.5s when in chat for snappy typing indicators & messages, or 2.5s elsewhere
-  const pollIntervalMs = document.querySelector("[data-chat-shell]") ? 1500 : 2500;
-  window.setInterval(() => pollLiveState(false), pollIntervalMs);
+  // Poll every 1.6s for snappy typing indicators, dock chat & feed updates
+  window.setInterval(() => pollLiveState(false), 1600);
   document.addEventListener("visibilitychange", () => {
     if (!document.hidden) pollLiveState(false);
   });
@@ -750,7 +859,11 @@
         });
         const data = await resp.json();
         if (data && data.redirect) {
-          window.location.href = data.redirect;
+          if (chatDockPanel && chatDockPanel.contains(form)) {
+            openChatDock(data.redirect);
+          } else {
+            window.location.href = data.redirect;
+          }
           return;
         }
         await pollLiveState(true);

@@ -400,6 +400,50 @@ def chat_inbox(request):
 
 
 @login_required
+def chat_dock(request, username=None):
+    """Render the Messenger/Reddit-style floating quick-chat popup (inbox list or active thread)."""
+    inbox, requests_list = _build_conversation_lists(request.user)
+    if username:
+        other = _target(username)
+        if other.pk == request.user.pk:
+            return redirect("accounts:chat_dock")
+        flags = _chat_partner_flags(request.user, other)
+        conv = flags["conversation"]
+        chat_messages = []
+        if conv:
+            conv.messages.filter(is_read=False).exclude(sender=request.user).update(is_read=True)
+            chat_messages = _annotate_chat_separators(list(conv.messages.select_related("sender").all()), conv=None)
+        tab = "requests" if flags["is_incoming_request"] else "inbox"
+        return render(
+            request,
+            "accounts/_chat_dock.html",
+            {
+                "inbox": inbox,
+                "requests": requests_list,
+                "tab": tab,
+                "active_partner": other,
+                **flags,
+                "chat_messages": chat_messages,
+                "friends_without_chat": request.user.friends().order_by("username"),
+            },
+        )
+
+    tab = "requests" if request.GET.get("tab") == "requests" else "inbox"
+    return render(
+        request,
+        "accounts/_chat_dock.html",
+        {
+            "inbox": inbox,
+            "requests": requests_list,
+            "tab": tab,
+            "active_partner": None,
+            "conversation": None,
+            "friends_without_chat": request.user.friends().order_by("username"),
+        },
+    )
+
+
+@login_required
 @ratelimit("chat", 60, 60)
 def chat_thread(request, username):
     other = _target(username)

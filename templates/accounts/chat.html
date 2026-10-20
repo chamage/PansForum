@@ -1,6 +1,7 @@
 {% extends "base.html" %}
 {% load forum_extras %}
 {% block title %}{% if active_partner %}Chat with {{ active_partner.name }} · {% endif %}Messages · {{ SITE_NAME }}{% endblock %}
+{% block chat_dock %}{% endblock %}
 {% block content %}
 <div class="chat-shell card" data-chat-shell data-chat-tab="{{ tab }}" data-chat-partner="{% if active_partner %}{{ active_partner.username }}{% endif %}" data-active-partner="{% if active_partner %}{{ active_partner.username }}{% endif %}">
   <!-- Left sidebar: Inbox & Message Requests -->

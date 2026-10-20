@@ -1,0 +1,58 @@
+{% load forum_extras %}
+<div class="chat-dock__inner" data-chat-shell data-chat-tab="{{ tab }}" data-chat-partner="{% if active_partner %}{{ active_partner.username }}{% endif %}" data-active-partner="{% if active_partner %}{{ active_partner.username }}{% endif %}">
+  {% if active_partner %}
+    <header class="chat-dock__head">
+      <div class="chat-dock__head-left">
+        <button type="button" class="btn btn--ghost btn--sm chat-dock__back" data-dock-url="{% url 'accounts:chat_dock' %}" title="Back to conversations" aria-label="Back to conversations">←</button>
+        <a class="chat-dock__partner" href="{{ active_partner.get_absolute_url }}">
+          {% avatar active_partner "xs" %}
+          <div class="chat-dock__partner-info">
+            <strong>{{ active_partner.name }}</strong>
+            <span class="muted small">@{{ active_partner.username }}<span id="chat-friend-badge" {% if not is_friends %}hidden{% endif %}> · ✓ Friend</span></span>
+          </div>
+        </a>
+      </div>
+      <div class="chat-dock__head-actions">
+        <a class="btn btn--ghost btn--sm" href="{% url 'accounts:chat_thread' active_partner.username %}" data-dock-full title="Open full messages page" aria-label="Open full messages page">↗</a>
+        <button type="button" class="btn btn--ghost btn--sm" data-dock-close title="Minimize chat" aria-label="Minimize chat">—</button>
+      </div>
+    </header>
+
+    <div id="chat-banner-slot">
+      {% include "accounts/_chat_banner.html" %}
+    </div>
+
+    <div class="chat-log chat-log--dock" id="chat-log">
+      {% if chat_messages %}
+        {% include "accounts/_chat_bubbles.html" %}
+      {% else %}
+        <div class="chat-empty muted" data-chat-empty>
+          <p>Say hi to <strong>{{ active_partner.name }}</strong> 👋</p>
+        </div>
+      {% endif %}
+    </div>
+
+    <div class="chat-typing muted small" id="chat-typing-indicator" aria-live="polite" hidden>
+      <span class="chat-typing__dots" aria-hidden="true"><span></span><span></span><span></span></span>
+      <span><strong>{{ active_partner.name }}</strong> is typing…</span>
+    </div>
+
+    <footer class="chat-main__foot chat-dock__foot" id="chat-foot-slot">
+      {% include "accounts/_chat_foot.html" %}
+    </footer>
+  {% else %}
+    <header class="chat-dock__head">
+      <div class="chat-dock__head-left">
+        <span class="chat-dock__title">💬 Quick Chat</span>
+      </div>
+      <div class="chat-dock__head-actions">
+        <a class="btn btn--ghost btn--sm" href="{% url 'accounts:chat_inbox' %}" data-dock-full title="Open full messages page" aria-label="Open full messages page">↗</a>
+        <button type="button" class="btn btn--ghost btn--sm" data-dock-close title="Minimize chat" aria-label="Minimize chat">—</button>
+      </div>
+    </header>
+
+    <div class="chat-dock__body" id="chat-sidebar">
+      {% include "accounts/_chat_sidebar.html" %}
+    </div>
+  {% endif %}
+</div>
