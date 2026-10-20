@@ -1,4 +1,4 @@
-{% load forum_extras %}<article class="card thread-card{% if thread.is_pinned and show_pins %} is-pinned{% endif %}" data-thread-card="{{ thread.pk }}" data-quick-view-card="{{ thread.get_absolute_url }}">
+{% load forum_extras %}<article class="card thread-card{% if thread.is_pinned and show_pins %} is-pinned{% endif %}" data-thread-id="{{ thread.pk }}" data-thread-card="{{ thread.pk }}" data-quick-view-card="{{ thread.get_absolute_url }}">
   {% include "forum/_vote.html" with kind="thread" obj=thread vote=votes|get_item:thread.pk %}
   <div class="thread-card__body">
     <div class="meta">
@@ -9,8 +9,8 @@
       {% if thread.is_pinned and show_pins %}<span class="tag tag--pin">Pinned</span>{% endif %}
       {% if thread.is_locked %}<span class="tag tag--lock">Locked</span>{% endif %}
     </div>
-    <h2 class="thread-card__title"><a href="{{ thread.get_absolute_url }}" data-quick-view="{{ thread.get_absolute_url }}">{{ thread.title }}</a></h2>
-    {% if thread.body %}<p class="thread-card__excerpt">{{ thread.body|truncatechars:240 }}</p>{% endif %}
+    <h2 class="thread-card__title"><a href="{{ thread.get_absolute_url }}" data-quick-view="{{ thread.get_absolute_url }}" data-thread-title="{{ thread.pk }}">{{ thread.title }}</a></h2>
+    {% if thread.body %}<p class="thread-card__excerpt" data-thread-excerpt="{{ thread.pk }}">{{ thread.body|truncatechars:240 }}</p>{% endif %}
     <div class="thread-card__foot">
       <a class="pill" href="{{ thread.get_absolute_url }}#comments" data-quick-view="{{ thread.get_absolute_url }}">
         <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 5h16v11H8l-4 4z"/></svg>

@@ -57,7 +57,7 @@
     </div>
   {% endif %}
 
-  <div data-live-comments="{{ thread.pk }}" data-csort="{{ csort }}">
+  <div data-live-comments="{{ thread.pk }}" data-thread-id="{{ thread.pk }}" data-csort="{{ csort }}">
     {% include "forum/_comments_section.html" %}
   </div>
 </section>

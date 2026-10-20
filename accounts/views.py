@@ -16,7 +16,7 @@ from django.utils import timezone
 from django.utils.decorators import method_decorator
 from django.views.decorators.http import require_POST
 
-from forum.models import Comment, CommentVote, Membership, Thread, ThreadVote
+from forum.models import Comment, CommentVote, Community, Membership, Thread, ThreadVote
 from pans_agora.utils import ratelimit, safe_next
 
 from .forms import (
@@ -839,23 +839,39 @@ def live_poll(request):
     if raw_ids:
         ids = [int(x) for x in raw_ids.split(",") if x.strip().isdigit()][:40]
         if ids:
+            found_threads = list(
+                Thread.objects.filter(pk__in=ids).values(
+                    "id", "score", "comment_count", "title", "is_pinned", "is_locked"
+                )
+            )
+            found_ids = {t["id"] for t in found_threads}
             data["threads"] = {
                 str(t["id"]): {
                     "score": t["score"],
                     "comment_count": t["comment_count"],
                     "title": t["title"],
+                    "is_pinned": t["is_pinned"],
+                    "is_locked": t["is_locked"],
                 }
-                for t in Thread.objects.filter(pk__in=ids).values("id", "score", "comment_count", "title")
+                for t in found_threads
             }
+            deleted_ids = [str(tid) for tid in ids if tid not in found_ids]
+            if deleted_ids:
+                data["deleted_thread_ids"] = deleted_ids
 
-    # 6. Live new threads in feed (when on page 1)
+    # 6. Live new threads in feed & community stats (when on page 1)
+    c_slug = request.GET.get("community", "").strip()
+    if c_slug:
+        comm = Community.objects.filter(slug=c_slug).values("slug", "member_count").first()
+        if comm:
+            data["community_info"] = comm
+
     feed = request.GET.get("feed", "")
     max_tid_raw = request.GET.get("max_thread_id", "")
     if feed and max_tid_raw.isdigit() and request.GET.get("page", "1") == "1":
         max_tid = int(max_tid_raw)
         qs = Thread.objects.filter(pk__gt=max_tid).select_related("author", "community").order_by("-created_at")
         if feed == "community":
-            c_slug = request.GET.get("community", "")
             qs = qs.filter(community__slug=c_slug)
         elif feed == "mine" and user.is_authenticated:
             joined = set(Membership.objects.filter(user=user).values_list("community_id", flat=True))

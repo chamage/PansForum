@@ -527,29 +527,35 @@
         params.set("profile_user", profileActions.dataset.profileUsername);
       }
 
-      // 4. Visible thread IDs (for live score & comment count sync)
+      // 4. Visible thread IDs (for live score, comment count, title & deletion sync)
       const threadIdSet = new Set();
-      document.querySelectorAll("[data-thread-id]").forEach((el) => {
-        if (el.dataset.threadId) threadIdSet.add(el.dataset.threadId);
+      document.querySelectorAll("[data-thread-id], [data-thread-card]").forEach((el) => {
+        const tid = el.dataset.threadId || el.dataset.threadCard;
+        if (tid) threadIdSet.add(tid);
       });
       if (threadIdSet.size > 0) {
         params.set("thread_ids", Array.from(threadIdSet).slice(0, 40).join(","));
       }
 
-      // 5. Feed list (for live new threads appearing at top of feed)
+      // 5. Feed list (for live new threads appearing at top of home or community feed)
       const feedList = document.getElementById("feed-list");
-      if (feedList && (feedList.dataset.page || "1") === "1") {
-        params.set("feed", feedList.dataset.feed || "all");
-        params.set("page", "1");
-        if (feedList.dataset.community) {
-          params.set("community", feedList.dataset.community);
+      if (feedList) {
+        const feedPage = feedList.dataset.livePage || feedList.dataset.page || "1";
+        const feedType = feedList.dataset.liveFeed || feedList.dataset.feed || "all";
+        const feedComm = feedList.dataset.liveCommunity || feedList.dataset.community || "";
+        if (feedComm) {
+          params.set("community", feedComm);
         }
-        let maxThreadId = 0;
-        feedList.querySelectorAll(".thread-card[data-thread-id]").forEach((card) => {
-          const tid = parseInt(card.dataset.threadId, 10);
-          if (tid > maxThreadId) maxThreadId = tid;
-        });
-        params.set("max_thread_id", String(maxThreadId));
+        if (feedPage === "1") {
+          params.set("feed", feedType);
+          params.set("page", "1");
+          let maxThreadId = 0;
+          feedList.querySelectorAll(".thread-card[data-thread-id], .thread-card[data-thread-card]").forEach((card) => {
+            const tid = parseInt(card.dataset.threadId || card.dataset.threadCard, 10);
+            if (tid > maxThreadId) maxThreadId = tid;
+          });
+          params.set("max_thread_id", String(maxThreadId));
+        }
       }
 
       // 6. Open thread comments (either in drawer if open, or full thread page)
@@ -560,8 +566,11 @@
       if (!activeCommentsEl) {
         activeCommentsEl = document.querySelector("[data-live-comments]");
       }
-      if (activeCommentsEl && activeCommentsEl.dataset.threadId) {
-        params.set("open_thread_id", activeCommentsEl.dataset.threadId);
+      const openThreadId = activeCommentsEl
+        ? activeCommentsEl.dataset.liveComments || activeCommentsEl.dataset.threadId || ""
+        : "";
+      if (activeCommentsEl && openThreadId) {
+        params.set("open_thread_id", openThreadId);
         params.set("csort", activeCommentsEl.dataset.csort || "best");
         params.set("comments_sig", forceUpdate ? "force" : activeCommentsEl.dataset.commentsSig || "init");
       }
@@ -668,7 +677,7 @@
         }
       }
 
-      // E. Update visible thread scores & comment counts
+      // E. Update visible thread scores, comment counts, titles & remove deleted threads
       if (data.threads) {
         Object.keys(data.threads).forEach((tid) => {
           const info = data.threads[tid];
@@ -678,21 +687,43 @@
           document.querySelectorAll(`[data-thread-comment-count="${tid}"]`).forEach((el) => {
             el.textContent = info.comment_count + " " + pluralize(info.comment_count, "comment", "comments");
           });
+          if (info.title) {
+            document.querySelectorAll(`[data-thread-title="${tid}"]`).forEach((el) => {
+              if (el.textContent !== info.title) el.textContent = info.title;
+            });
+          }
         });
       }
 
-      // F. Prepend new threads to feed
+      if (Array.isArray(data.deleted_thread_ids)) {
+        data.deleted_thread_ids.forEach((tid) => {
+          document
+            .querySelectorAll(`.thread-card[data-thread-id="${tid}"], .thread-card[data-thread-card="${tid}"]`)
+            .forEach((card) => card.remove());
+        });
+      }
+
+      if (data.community_info && data.community_info.slug) {
+        const mc = data.community_info.member_count;
+        document.querySelectorAll(`[data-community-member-count="${data.community_info.slug}"]`).forEach((el) => {
+          el.textContent = mc + " " + pluralize(mc, "member", "members");
+        });
+      }
+
+      // F. Prepend new threads to feed (home or community)
       if (feedList && data.new_threads_html) {
         const temp = document.createElement("div");
         temp.innerHTML = data.new_threads_html;
-        const emptyFeed = document.getElementById("feed-empty");
-        if (emptyFeed) emptyFeed.remove();
+        feedList.querySelectorAll("[data-feed-empty], #feed-empty").forEach((el) => el.remove());
 
         const firstUnpinned =
-          feedList.querySelector(".thread-card:not(.thread-card--pinned)") || feedList.firstElementChild;
+          feedList.querySelector(".thread-card:not(.is-pinned):not(.thread-card--pinned)") || feedList.firstElementChild;
         Array.from(temp.children).forEach((card) => {
-          const tid = card.dataset && card.dataset.threadId;
-          if (tid && !feedList.querySelector(`.thread-card[data-thread-id="${tid}"]`)) {
+          const tid = card.dataset && (card.dataset.threadId || card.dataset.threadCard);
+          if (
+            tid &&
+            !feedList.querySelector(`.thread-card[data-thread-id="${tid}"], .thread-card[data-thread-card="${tid}"]`)
+          ) {
             if (firstUnpinned) {
               feedList.insertBefore(card, firstUnpinned);
             } else {

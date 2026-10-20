@@ -7,7 +7,7 @@
   <span class="community-dot community-dot--xl" aria-hidden="true">{{ community.name|first|upper }}</span>
   <div class="community-hero__text">
     <h1>{{ community.name }}</h1>
-    <span class="muted">c/{{ community.slug }} · {{ community.member_count }} member{{ community.member_count|pluralize }}</span>
+    <span class="muted">c/{{ community.slug }} · <span data-community-member-count="{{ community.slug }}">{{ community.member_count }} member{{ community.member_count|pluralize }}</span></span>
   </div>
   <div class="community-hero__actions">
     {% include "forum/_join_button.html" %}

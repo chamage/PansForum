@@ -232,7 +232,6 @@ def thread_create(request, slug=None):
             thread.score = 1
             thread.save()
             ThreadVote.objects.create(user=request.user, thread=thread, value=1)
-        messages.success(request, "Your thread is live.")
         return redirect(thread)
     return render(request, "forum/thread_form.html", {"form": form, "community": community})
 
