@@ -1,0 +1,84 @@
+{% load static forum_extras %}<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="csrf-token" content="{{ csrf_token }}">
+  <meta name="description" content="{% block description %}{{ SITE_NAME }} — the student forum for PANS. Ask questions, share notes and meet people from your courses.{% endblock %}">
+  <meta name="color-scheme" content="light dark">
+  <title>{% block title %}{{ SITE_NAME }}{% endblock %}</title>
+  <link rel="icon" href="{% static 'img/favicon.svg' %}" type="image/svg+xml">
+  <link rel="stylesheet" href="{% static 'css/style.css' %}">
+  <script src="{% static 'js/app.js' %}" defer></script>
+</head>
+<body data-auth="{% if user.is_authenticated %}1{% else %}0{% endif %}">
+  <a class="skip-link" href="#main">Skip to content</a>
+
+  <div class="page-shell" id="page-shell">
+    <header class="topbar">
+      <div class="container topbar__inner">
+        <a class="brand" href="{% url 'forum:home' %}" aria-label="{{ SITE_NAME }} home">
+          <span class="brand__mark" aria-hidden="true">P</span>
+          <span class="brand__name">PANS <b>Agora</b></span>
+        </a>
+
+        <form class="search" action="{% url 'forum:search' %}" method="get" role="search">
+          <svg class="search__icon" viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg>
+          <input type="search" name="q" placeholder="Search threads, communities, people…" value="{{ q|default:'' }}" aria-label="Search" maxlength="100">
+        </form>
+
+        <nav class="topnav" aria-label="Main">
+          <a class="topnav__link" href="{% url 'forum:community_list' %}">Communities</a>
+          {% if user.is_authenticated %}
+            <a class="topnav__link" href="{% url 'accounts:chat_inbox' %}">
+              Messages <span class="badge" data-live-messages-badge {% if not unread_messages_count %}hidden{% endif %}>{% if unread_messages_count %}{{ unread_messages_count }}{% endif %}</span>
+            </a>
+            <a class="topnav__link" href="{% url 'accounts:friends' %}">
+              Friends <span class="badge" data-live-friends-badge {% if not pending_friend_requests %}hidden{% endif %}>{% if pending_friend_requests %}{{ pending_friend_requests }}{% endif %}</span>
+            </a>
+            <a class="btn btn--primary btn--sm" href="{% url 'forum:submit' %}">+ New thread</a>
+            <details class="menu">
+              <summary aria-label="Account menu">{% avatar user "sm" %}</summary>
+              <div class="menu__panel">
+                <div class="menu__head"><strong>{{ user.name }}</strong><span class="muted">@{{ user.username }}</span></div>
+                <a href="{{ user.get_absolute_url }}">My profile</a>
+                <a href="{% url 'accounts:chat_inbox' %}">Messages</a>
+                <a href="{% url 'accounts:friends' %}">Friends</a>
+                <a href="{% url 'accounts:settings_profile' %}">Settings</a>
+                {% if user.is_staff %}<a href="{% url 'admin:index' %}">Admin panel</a>{% endif %}
+                <form method="post" action="{% url 'accounts:logout' %}">{% csrf_token %}<button type="submit">Log out</button></form>
+              </div>
+            </details>
+          {% else %}
+            <a class="topnav__link" href="{% url 'accounts:login' %}">Log in</a>
+            <a class="btn btn--primary btn--sm" href="{% url 'accounts:register' %}">Sign up</a>
+          {% endif %}
+        </nav>
+      </div>
+    </header>
+
+    <div class="container toasts" id="toast-container" role="status" aria-live="polite">
+      {% for message in messages %}
+        <div class="toast toast--{{ message.tags }}">
+          <span>{{ message }}</span>
+          <button type="button" class="toast__close" data-dismiss aria-label="Dismiss">×</button>
+        </div>
+      {% endfor %}
+    </div>
+
+    <main id="main" class="container main">
+      {% block content %}{% endblock %}
+    </main>
+
+    <footer class="footer">
+      <div class="container footer__inner">
+        <span>© {% now "Y" %} {{ SITE_NAME }} · made by students, for students</span>
+        <nav><a href="{% url 'forum:guidelines' %}">Community guidelines</a> · <a href="{% url 'forum:community_list' %}">Communities</a></nav>
+      </div>
+    </footer>
+  </div>
+
+  <div id="quick-backdrop" class="drawer-backdrop" data-drawer-close hidden></div>
+  <aside id="quick-drawer" class="drawer" role="dialog" aria-modal="true" aria-label="Thread quick view" hidden></aside>
+</body>
+</html>

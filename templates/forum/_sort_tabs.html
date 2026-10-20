@@ -1,0 +1,5 @@
+<nav class="tabs" aria-label="Sort">
+  {% for key, label in sort_options %}
+    <a class="tabs__item{% if sort == key %} is-active{% endif %}" href="{% querystring sort=key page=None %}"{% if sort == key %} aria-current="page"{% endif %}>{{ label }}</a>
+  {% endfor %}
+</nav>

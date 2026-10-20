@@ -1,0 +1,16 @@
+<div class="discussion__head">
+  <h2>{{ thread.comment_count }} comment{{ thread.comment_count|pluralize }}</h2>
+  <nav class="tabs" aria-label="Sort comments">
+    {% for key, label in comment_sort_options %}
+      <a class="tabs__item{% if csort == key %} is-active{% endif %}" href="{{ thread.get_absolute_url }}?sort={{ key }}" data-drawer-sort="{{ thread.get_absolute_url }}?sort={{ key }}"{% if csort == key %} aria-current="page"{% endif %}>{{ label }}</a>
+    {% endfor %}
+  </nav>
+</div>
+
+<div class="comments">
+  {% for comment in comments %}
+    {% include "forum/_comment.html" %}
+  {% empty %}
+    <p class="muted empty-comments">No comments yet. Share your thoughts!</p>
+  {% endfor %}
+</div>

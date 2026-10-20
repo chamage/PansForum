@@ -1,0 +1,16 @@
+{% extends "base.html" %}
+{% block title %}Sign up · {{ SITE_NAME }}{% endblock %}
+{% block content %}
+<div class="auth">
+  <div class="card auth__card">
+    <h1>Join the Agora</h1>
+    <p class="muted">Create your free account in under a minute.</p>
+    <form method="post" novalidate>
+      {% csrf_token %}
+      {% include "components/form.html" %}
+      <button class="btn btn--primary btn--block" type="submit">Create account</button>
+    </form>
+    <p class="auth__alt">Already have an account? <a href="{% url 'accounts:login' %}">Log in</a></p>
+  </div>
+</div>
+{% endblock %}

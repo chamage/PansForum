@@ -1,0 +1,44 @@
+{% load forum_extras %}
+{% if incoming %}
+<section class="card section">
+  <h2>Friend requests <span class="badge">{{ incoming|length }}</span></h2>
+  <ul class="request-list">
+    {% for fr in incoming %}
+      <li>
+        <a class="request-list__who" href="{{ fr.from_user.get_absolute_url }}">{% avatar fr.from_user "sm" %}<span><strong>{{ fr.from_user.name }}</strong> <span class="muted small">@{{ fr.from_user.username }} · {{ fr.created_at|timesince }} ago</span></span></a>
+        <div class="request-list__actions">
+          <form method="post" action="{% url 'accounts:friend_accept' fr.pk %}" class="inline" data-friend-action>{% csrf_token %}<button class="btn btn--primary btn--sm" type="submit">Accept</button></form>
+          <form method="post" action="{% url 'accounts:friend_decline' fr.pk %}" class="inline" data-friend-action>{% csrf_token %}<button class="btn btn--ghost btn--sm" type="submit">Decline</button></form>
+        </div>
+      </li>
+    {% endfor %}
+  </ul>
+</section>
+{% endif %}
+
+{% if outgoing %}
+<section class="card section">
+  <h2>Sent requests</h2>
+  <ul class="request-list">
+    {% for fr in outgoing %}
+      <li>
+        <a class="request-list__who" href="{{ fr.to_user.get_absolute_url }}">{% avatar fr.to_user "sm" %}<span><strong>{{ fr.to_user.name }}</strong> <span class="muted small">@{{ fr.to_user.username }}</span></span></a>
+        <form method="post" action="{% url 'accounts:friend_cancel' fr.to_user.username %}" class="inline" data-friend-action>{% csrf_token %}<input type="hidden" name="next" value="{{ request.path }}"><button class="btn btn--ghost btn--sm" type="submit">Cancel</button></form>
+      </li>
+    {% endfor %}
+  </ul>
+</section>
+{% endif %}
+
+<h2 class="section-title">Your friends ({{ friend_list|length }})</h2>
+<div class="grid grid--people">
+  {% for friend in friend_list %}
+    {% include "accounts/_user_card.html" with person=friend %}
+  {% empty %}
+    <div class="empty card">
+      <p class="empty__emoji" aria-hidden="true">🤝</p>
+      <h2>No friends yet</h2>
+      <p class="muted">Use the search bar to find people from your courses.</p>
+    </div>
+  {% endfor %}
+</div>

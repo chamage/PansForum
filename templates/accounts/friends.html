@@ -1,0 +1,10 @@
+{% extends "base.html" %}
+{% load forum_extras %}
+{% block title %}Friends · {{ SITE_NAME }}{% endblock %}
+{% block content %}
+<div class="page-head"><div><h1>Friends</h1><p class="muted">Find classmates by searching their name, then add them from their profile.</p></div></div>
+
+<div id="friends-live-region" data-friends-region>
+  {% include "accounts/_friends_region.html" %}
+</div>
+{% endblock %}

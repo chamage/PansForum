@@ -1,0 +1,10 @@
+{% extends "accounts/settings_base.html" %}
+{% block settings %}
+<h1>Email address</h1>
+<p class="muted">Your current email is <strong>{{ user.email }}</strong>. It's private and only used for account recovery.</p>
+<form method="post" novalidate>
+  {% csrf_token %}
+  {% include "components/form.html" %}
+  <div class="form-actions"><button class="btn btn--primary" type="submit">Update email</button></div>
+</form>
+{% endblock %}

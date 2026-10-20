@@ -1,0 +1,15 @@
+{% extends "base.html" %}
+{% block title %}Settings · {{ SITE_NAME }}{% endblock %}
+{% block content %}
+<div class="settings">
+  <nav class="settings__nav card" aria-label="Settings">
+    <a href="{% url 'accounts:settings_profile' %}" class="{% if section == 'profile' %}is-active{% endif %}">Profile</a>
+    <a href="{% url 'accounts:settings_account' %}" class="{% if section == 'account' %}is-active{% endif %}">Email</a>
+    <a href="{% url 'accounts:settings_password' %}" class="{% if section == 'password' %}is-active{% endif %}">Password</a>
+    <a href="{% url 'accounts:settings_delete' %}" class="danger{% if section == 'delete' %} is-active{% endif %}">Delete account</a>
+  </nav>
+  <section class="settings__body card form-card">
+    {% block settings %}{% endblock %}
+  </section>
+</div>
+{% endblock %}

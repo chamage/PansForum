@@ -1,0 +1,21 @@
+{% extends "base.html" %}
+{% load forum_extras %}
+{% block title %}{{ thread.title }} · c/{{ community.slug }} · {{ SITE_NAME }}{% endblock %}
+{% block description %}{{ thread.body|default:thread.title|truncatechars:150 }}{% endblock %}
+{% block content %}
+<div class="layout">
+  <section class="layout__main">
+    <a class="backlink" href="{{ community.get_absolute_url }}">← c/{{ community.slug }}</a>
+    {% include "forum/_thread_content.html" %}
+  </section>
+
+  <aside class="layout__side">
+    <div class="card side-card">
+      <h3><a href="{{ community.get_absolute_url }}">c/{{ community.slug }}</a></h3>
+      <p>{{ community.description|default:"No description yet."|truncatechars:200 }}</p>
+      <p class="muted small">{{ community.member_count }} member{{ community.member_count|pluralize }}</p>
+      {% include "forum/_join_button.html" %}
+    </div>
+  </aside>
+</div>
+{% endblock %}

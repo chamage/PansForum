@@ -1,0 +1,18 @@
+{% extends "base.html" %}
+{% block title %}Log in · {{ SITE_NAME }}{% endblock %}
+{% block content %}
+<div class="auth">
+  <div class="card auth__card">
+    <h1>Welcome back</h1>
+    <p class="muted">Log in to join the discussion.</p>
+    <form method="post" novalidate>
+      {% csrf_token %}
+      <input type="hidden" name="next" value="{{ next }}">
+      {% include "components/form.html" %}
+      <button class="btn btn--primary btn--block" type="submit">Log in</button>
+    </form>
+    <p class="auth__alt"><a href="{% url 'accounts:password_reset' %}">Forgot your password?</a></p>
+    <p class="auth__alt">New here? <a href="{% url 'accounts:register' %}">Create an account</a></p>
+  </div>
+</div>
+{% endblock %}

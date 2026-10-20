@@ -1,0 +1,12 @@
+{% extends "base.html" %}
+{% block title %}Access denied · {{ SITE_NAME }}{% endblock %}
+{% block content %}
+<div class="auth">
+  <div class="card auth__card empty">
+    <p class="empty__emoji" aria-hidden="true">🔒</p>
+    <h1>Access denied</h1>
+    <p class="muted">You don't have permission to do that.</p>
+    <a class="btn btn--primary" href="{% url 'forum:home' %}">Back to home</a>
+  </div>
+</div>
+{% endblock %}

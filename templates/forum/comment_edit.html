@@ -1,0 +1,18 @@
+{% extends "base.html" %}
+{% block title %}Edit comment · {{ SITE_NAME }}{% endblock %}
+{% block content %}
+<div class="narrow">
+  <div class="card form-card">
+    <h1>Edit comment</h1>
+    <p class="muted">In <a href="{{ comment.thread.get_absolute_url }}">{{ comment.thread.title }}</a></p>
+    <form method="post" novalidate>
+      {% csrf_token %}
+      {% include "components/form.html" %}
+      <div class="form-actions">
+        <a class="btn btn--ghost" href="{{ comment.get_absolute_url }}">Cancel</a>
+        <button class="btn btn--primary" type="submit">Save</button>
+      </div>
+    </form>
+  </div>
+</div>
+{% endblock %}

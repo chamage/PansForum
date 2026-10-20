@@ -1,0 +1,29 @@
+{% extends "base.html" %}
+{% block title %}Communities · {{ SITE_NAME }}{% endblock %}
+{% block content %}
+<div class="page-head">
+  <div>
+    <h1>Communities</h1>
+    <p class="muted">Find your courses, clubs and interests.</p>
+  </div>
+  {% if user.is_authenticated %}<a class="btn btn--primary" href="{% url 'forum:community_create' %}">+ Create community</a>{% endif %}
+</div>
+
+<div class="grid">
+  {% for community in communities %}
+    <article class="card community-card">
+      <div class="community-card__top">
+        <span class="community-dot community-dot--lg" aria-hidden="true">{{ community.name|first|upper }}</span>
+        <div>
+          <h2><a href="{{ community.get_absolute_url }}">{{ community.name }}</a></h2>
+          <span class="muted small">c/{{ community.slug }} · {{ community.member_count }} member{{ community.member_count|pluralize }}</span>
+        </div>
+      </div>
+      <p class="community-card__desc">{{ community.description|default:"No description yet."|truncatechars:160 }}</p>
+      <div class="community-card__foot">{% include "forum/_join_button.html" %}</div>
+    </article>
+  {% empty %}
+    <div class="empty card"><h2>No communities yet</h2><p class="muted">Create the first one!</p></div>
+  {% endfor %}
+</div>
+{% endblock %}

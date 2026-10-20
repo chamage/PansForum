@@ -1,0 +1,39 @@
+{% extends "base.html" %}
+{% load forum_extras %}
+{% block title %}{% if q %}“{{ q }}” · {% endif %}Search · {{ SITE_NAME }}{% endblock %}
+{% block content %}
+<div class="page-head"><h1>{% if q %}Results for “{{ q }}”{% else %}Search{% endif %}</h1></div>
+
+{% if not q or q|length < 2 %}
+  <div class="empty card"><p class="muted">Type at least two characters in the search bar above.</p></div>
+{% else %}
+  {% if communities or users %}
+  <div class="search-extras">
+    {% if communities %}
+      <div class="card side-card">
+        <h3>Communities</h3>
+        <ul class="community-mini">
+          {% for community in communities %}<li><a href="{{ community.get_absolute_url }}"><span class="community-dot" aria-hidden="true">{{ community.name|first|upper }}</span><span>c/{{ community.slug }}</span></a></li>{% endfor %}
+        </ul>
+      </div>
+    {% endif %}
+    {% if users %}
+      <div class="card side-card">
+        <h3>People</h3>
+        <ul class="people-mini">
+          {% for u in users %}<li>{% avatar u "xs" %} {% user_link u %} <span class="muted small">@{{ u.username }}</span></li>{% endfor %}
+        </ul>
+      </div>
+    {% endif %}
+  </div>
+  {% endif %}
+
+  <h2 class="section-title">Threads</h2>
+  {% for thread in page %}
+    {% include "forum/_thread_card.html" %}
+  {% empty %}
+    <div class="empty card"><p class="muted">No threads matched your search.</p></div>
+  {% endfor %}
+  {% include "components/pagination.html" %}
+{% endif %}
+{% endblock %}

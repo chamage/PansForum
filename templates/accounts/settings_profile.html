@@ -1,0 +1,48 @@
+{% extends "accounts/settings_base.html" %}
+{% load forum_extras %}
+{% block settings %}
+<h1>Profile</h1>
+<p class="muted">This is how other students see you. <a href="{{ user.get_absolute_url }}">View your profile →</a></p>
+
+<form method="post" enctype="multipart/form-data" novalidate>
+  {% csrf_token %}
+  {% if form.non_field_errors %}<div class="alert alert--error">{% for e in form.non_field_errors %}<p>{{ e }}</p>{% endfor %}</div>{% endif %}
+
+  <div class="profile-preview">
+    <div class="profile-preview__banner{% if not preview_user.banner %} banner--{{ preview_user.banner_theme }}{% endif %}" data-banner-preview>
+      <img id="banner-preview" src="{% if preview_user.banner %}{{ preview_user.banner.url }}{% endif %}" alt="" class="{% if not preview_user.banner %}is-empty{% endif %}">
+    </div>
+    <div class="profile-preview__avatar">
+      {% if preview_user.avatar %}
+        <img id="avatar-preview" class="avatar avatar--xl" src="{{ preview_user.avatar.url }}" alt="Your avatar">
+      {% else %}
+        <img id="avatar-preview" class="avatar avatar--xl is-empty" src="" alt="">
+        <span class="avatar avatar--xl avatar--c{{ preview_user.pk|divisibleby:1|yesno:'0,0' }}" data-avatar-fallback>{{ preview_user.initial }}</span>
+      {% endif %}
+    </div>
+  </div>
+
+  <div class="form-grid">
+    <fieldset class="fieldset">
+      <legend>Avatar</legend>
+      {% include "components/field.html" with field=form.avatar %}
+      {% if preview_user.avatar %}{% include "components/field.html" with field=form.remove_avatar %}{% endif %}
+    </fieldset>
+    <fieldset class="fieldset">
+      <legend>Banner</legend>
+      {% include "components/field.html" with field=form.banner %}
+      {% if preview_user.banner %}{% include "components/field.html" with field=form.remove_banner %}{% endif %}
+    </fieldset>
+  </div>
+  {% include "components/field.html" with field=form.banner_theme %}
+
+  <div class="form-grid">
+    {% include "components/field.html" with field=form.display_name %}
+    {% include "components/field.html" with field=form.field_of_study %}
+  </div>
+  {% include "components/field.html" with field=form.year_of_study %}
+  {% include "components/field.html" with field=form.bio %}
+
+  <div class="form-actions"><button class="btn btn--primary" type="submit">Save profile</button></div>
+</form>
+{% endblock %}

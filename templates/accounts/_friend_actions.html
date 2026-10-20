@@ -1,0 +1,29 @@
+{% if rel == "self" %}
+  <a class="btn btn--ghost btn--sm" href="{% url 'accounts:settings_profile' %}">Edit profile</a>
+{% elif rel == "anonymous" %}
+  <a class="btn btn--ghost btn--sm" href="{% url 'accounts:login' %}?next={{ request.path|urlencode }}">Message</a>
+  <a class="btn btn--primary btn--sm" href="{% url 'accounts:login' %}?next={{ request.path|urlencode }}">Add friend</a>
+{% else %}
+  <a class="btn btn--ghost btn--sm" href="{% url 'accounts:chat_thread' profile_user.username %}">💬 Message</a>
+  {% if rel == "none" %}
+    <form method="post" action="{% url 'accounts:friend_add' profile_user.username %}" class="inline" data-friend-action>
+      {% csrf_token %}<button class="btn btn--primary btn--sm" type="submit">+ Add friend</button>
+    </form>
+  {% elif rel == "outgoing" %}
+    <form method="post" action="{% url 'accounts:friend_cancel' profile_user.username %}" class="inline" data-friend-action>
+      {% csrf_token %}<button class="btn btn--ghost btn--sm" type="submit">Request sent · Cancel</button>
+    </form>
+  {% elif rel == "incoming" %}
+    <form method="post" action="{% url 'accounts:friend_accept' friend_request.pk %}" class="inline" data-friend-action>
+      {% csrf_token %}<input type="hidden" name="next" value="{{ request.path }}"><button class="btn btn--primary btn--sm" type="submit">Accept request</button>
+    </form>
+    <form method="post" action="{% url 'accounts:friend_decline' friend_request.pk %}" class="inline" data-friend-action>
+      {% csrf_token %}<input type="hidden" name="next" value="{{ request.path }}"><button class="btn btn--ghost btn--sm" type="submit">Decline</button>
+    </form>
+  {% elif rel == "friends" %}
+    <span class="tag tag--friends">✓ Friends</span>
+    <form method="post" action="{% url 'accounts:friend_remove' profile_user.username %}" class="inline" data-friend-action data-confirm="Remove {{ profile_user.name }} from your friends?">
+      {% csrf_token %}<button class="btn btn--ghost btn--sm" type="submit">Unfriend</button>
+    </form>
+  {% endif %}
+{% endif %}

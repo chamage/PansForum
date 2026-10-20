@@ -1,0 +1,18 @@
+{% extends "base.html" %}
+{% block title %}Report · {{ SITE_NAME }}{% endblock %}
+{% block content %}
+<div class="narrow">
+  <div class="card form-card">
+    <h1>Report {{ kind }}</h1>
+    <blockquote class="quote">{% if kind == "thread" %}{{ target.title }}{% else %}{{ target.body|truncatechars:240 }}{% endif %}</blockquote>
+    <form method="post" novalidate>
+      {% csrf_token %}
+      {% include "components/form.html" %}
+      <div class="form-actions">
+        <a class="btn btn--ghost" href="{{ back }}">Cancel</a>
+        <button class="btn btn--danger" type="submit">Send report</button>
+      </div>
+    </form>
+  </div>
+</div>
+{% endblock %}

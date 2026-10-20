@@ -1,0 +1,15 @@
+{% if user.is_authenticated %}
+  {% if community.pk in joined_ids %}
+    <form method="post" action="{% url 'forum:community_leave' community.slug %}" class="inline">
+      {% csrf_token %}<input type="hidden" name="next" value="{{ request.get_full_path }}">
+      <button type="submit" class="btn btn--ghost btn--sm btn--joined"><span class="when-idle">Joined</span><span class="when-hover">Leave</span></button>
+    </form>
+  {% else %}
+    <form method="post" action="{% url 'forum:community_join' community.slug %}" class="inline">
+      {% csrf_token %}<input type="hidden" name="next" value="{{ request.get_full_path }}">
+      <button type="submit" class="btn btn--primary btn--sm">Join</button>
+    </form>
+  {% endif %}
+{% else %}
+  <a class="btn btn--primary btn--sm" href="{% url 'accounts:login' %}?next={{ request.path|urlencode }}">Join</a>
+{% endif %}

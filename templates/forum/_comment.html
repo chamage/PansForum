@@ -1,0 +1,52 @@
+{% load forum_extras %}<div class="comment{% if comment.is_deleted %} is-deleted{% endif %}" id="c{{ comment.pk }}">
+  <div class="comment__head">
+    {% if comment.is_deleted %}{% avatar None "xs" %}<span class="muted">[deleted]</span>{% else %}{% avatar comment.author "xs" %}{% user_link comment.author %}{% endif %}
+    {% if not comment.is_deleted and comment.author_id and comment.author_id == thread.author_id %}<span class="tag tag--op" title="Original poster">OP</span>{% endif %}
+    <span aria-hidden="true" class="muted">·</span>
+    <a class="muted" href="#c{{ comment.pk }}"><time datetime="{{ comment.created_at|date:'c' }}" title="{{ comment.created_at }}">{{ comment.created_at|timesince }} ago</time></a>
+    {% if comment.edited_at and not comment.is_deleted %}<span class="muted">· edited</span>{% endif %}
+  </div>
+
+  <div class="comment__body prose">
+    {% if comment.is_deleted %}<p class="muted"><em>This comment was deleted.</em></p>{% else %}{{ comment.body|render_body }}{% endif %}
+  </div>
+
+  {% if not comment.is_deleted %}
+  <div class="comment__actions">
+    {% include "forum/_vote.html" with kind="comment" obj=comment vote=comment_votes|get_item:comment.pk inline=True %}
+    {% if user.is_authenticated %}
+      {% if comment.can_reply and not thread.is_locked %}
+        <details class="reply">
+          <summary class="action">Reply</summary>
+          <form method="post" action="{% url 'forum:comment_create' thread.pk %}" class="comment-form comment-form--reply">
+            {% csrf_token %}
+            <input type="hidden" name="parent" value="{{ comment.pk }}">
+            <label class="sr-only" for="reply-{{ comment.pk }}">Reply</label>
+            <textarea id="reply-{{ comment.pk }}" name="body" rows="3" maxlength="10000" required placeholder="Write a reply…"></textarea>
+            <div class="form-actions"><button class="btn btn--primary btn--sm" type="submit">Reply</button></div>
+          </form>
+        </details>
+      {% endif %}
+      {% if comment.author_id == user.pk %}
+        <a class="action" href="{% url 'forum:comment_edit' comment.pk %}">Edit</a>
+      {% endif %}
+      {% if comment.author_id == user.pk or is_mod %}
+        <form method="post" action="{% url 'forum:comment_delete' comment.pk %}" class="inline" data-confirm="Delete this comment?" data-comment-delete>
+          {% csrf_token %}<button type="submit" class="action action--danger">Delete</button>
+        </form>
+      {% endif %}
+      {% if comment.author_id != user.pk %}
+        <a class="action" href="{% url 'forum:comment_report' comment.pk %}">Report</a>
+      {% endif %}
+    {% endif %}
+  </div>
+  {% endif %}
+
+  {% if comment.children %}
+    <div class="comment__children">
+      {% for child in comment.children %}
+        {% include "forum/_comment.html" with comment=child %}
+      {% endfor %}
+    </div>
+  {% endif %}
+</div>

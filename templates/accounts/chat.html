@@ -1,0 +1,58 @@
+{% extends "base.html" %}
+{% load forum_extras %}
+{% block title %}{% if active_partner %}Chat with {{ active_partner.name }} · {% endif %}Messages · {{ SITE_NAME }}{% endblock %}
+{% block content %}
+<div class="chat-shell card" data-chat-shell data-chat-tab="{{ tab }}" data-chat-partner="{% if active_partner %}{{ active_partner.username }}{% endif %}" data-active-partner="{% if active_partner %}{{ active_partner.username }}{% endif %}">
+  <!-- Left sidebar: Inbox & Message Requests -->
+  <aside class="chat-side" id="chat-sidebar">
+    {% include "accounts/_chat_sidebar.html" %}
+  </aside>
+
+  <!-- Right pane: Active conversation -->
+  <section class="chat-main">
+    {% if active_partner %}
+      <header class="chat-main__head">
+        <a class="chat-main__partner" href="{{ active_partner.get_absolute_url }}">
+          {% avatar active_partner "md" %}
+          <div>
+            <strong>{{ active_partner.name }}</strong>
+            <span class="muted small">@{{ active_partner.username }}
+              <span id="chat-friend-badge" {% if not is_friends %}hidden{% endif %}> · <span class="tag tag--pin">✓ Friends — free DM</span></span>
+            </span>
+          </div>
+        </a>
+        <a class="btn btn--ghost btn--sm" href="{{ active_partner.get_absolute_url }}">View profile</a>
+      </header>
+
+      <div id="chat-banner-slot">
+        {% include "accounts/_chat_banner.html" %}
+      </div>
+
+      <div class="chat-log" id="chat-log">
+        {% if chat_messages %}
+          {% include "accounts/_chat_bubbles.html" %}
+        {% else %}
+          <div class="chat-empty muted" data-chat-empty>
+            <p>Say hi to <strong>{{ active_partner.name }}</strong> 👋</p>
+          </div>
+        {% endif %}
+      </div>
+
+      <div class="chat-typing muted small" id="chat-typing-indicator" aria-live="polite" hidden>
+        <span class="chat-typing__dots" aria-hidden="true"><span></span><span></span><span></span></span>
+        <span><strong>{{ active_partner.name }}</strong> is typing…</span>
+      </div>
+
+      <footer class="chat-main__foot" id="chat-foot-slot">
+        {% include "accounts/_chat_foot.html" %}
+      </footer>
+    {% else %}
+      <div class="chat-placeholder empty">
+        <p class="empty__emoji" aria-hidden="true">💬</p>
+        <h2>Your messages</h2>
+        <p class="muted">Friends can DM each other freely. Non-friends can send a message request that you can choose to respond to or ignore.</p>
+      </div>
+    {% endif %}
+  </section>
+</div>
+{% endblock %}

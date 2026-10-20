@@ -1,0 +1,13 @@
+<div class="drawer__bar">
+  <div class="drawer__bar-left">
+    <button type="button" class="btn btn--ghost btn--sm" data-drawer-close aria-label="Close quick view">✕ Close <span class="drawer__kbd">Esc</span></button>
+    <a class="chip" href="{{ community.get_absolute_url }}">c/{{ community.slug }}</a>
+  </div>
+  <div class="drawer__bar-right">
+    <a class="btn btn--primary btn--sm" href="{{ thread.get_absolute_url }}">Open full thread ↗</a>
+  </div>
+</div>
+
+<div class="drawer__scroll">
+  {% include "forum/_thread_content.html" %}
+</div>

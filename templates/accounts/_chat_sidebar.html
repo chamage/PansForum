@@ -1,0 +1,75 @@
+{% load forum_extras %}
+<div class="chat-side__head">
+  <h1>Messages</h1>
+  <div class="segmented">
+    <a href="{% url 'accounts:chat_inbox' %}" class="{% if tab == 'inbox' %}is-active{% endif %}">Inbox</a>
+    <a href="{% url 'accounts:chat_inbox' %}?tab=requests" class="{% if tab == 'requests' %}is-active{% endif %}">
+      Requests{% if requests %} <span class="badge">{{ requests|length }}</span>{% endif %}
+    </a>
+  </div>
+</div>
+
+{% if tab == "requests" %}
+  <ul class="chat-list">
+    {% for conv in requests %}
+      <li>
+        <a href="{% url 'accounts:chat_thread' conv.partner.username %}" class="chat-list__item{% if active_partner and active_partner.pk == conv.partner.pk %} is-active{% endif %}">
+          {% avatar conv.partner "md" %}
+          <div class="chat-list__body">
+            <div class="chat-list__top">
+              <strong>{{ conv.partner.name }}</strong>
+              <span class="tag">Request</span>
+            </div>
+            <p class="chat-list__preview muted">
+              {% if conv.last_message %}{{ conv.last_message.preview_text|truncatechars:45 }}{% else %}Message request{% endif %}
+            </p>
+          </div>
+          {% if conv.unread_count %}<span class="badge">{{ conv.unread_count }}</span>{% endif %}
+        </a>
+      </li>
+    {% empty %}
+      <li class="chat-list__empty muted small">No pending message requests from non-friends.</li>
+    {% endfor %}
+  </ul>
+{% else %}
+  <ul class="chat-list">
+    {% for conv in inbox %}
+      <li>
+        <a href="{% url 'accounts:chat_thread' conv.partner.username %}" class="chat-list__item{% if active_partner and active_partner.pk == conv.partner.pk %} is-active{% endif %}">
+          {% avatar conv.partner "md" %}
+          <div class="chat-list__body">
+            <div class="chat-list__top">
+              <strong>{{ conv.partner.name }}</strong>
+              {% if conv.is_friend %}
+                <span class="tag tag--pin">Friend</span>
+              {% elif conv.status == "pending" or conv.status == "ignored" %}
+                <span class="tag">Pending</span>
+              {% endif %}
+            </div>
+            <p class="chat-list__preview muted">
+              {% if conv.last_message %}
+                {% if conv.last_message.sender_id == user.pk %}You: {% endif %}{{ conv.last_message.preview_text|truncatechars:45 }}
+              {% else %}
+                No messages yet
+              {% endif %}
+            </p>
+          </div>
+          {% if conv.unread_count %}<span class="badge">{{ conv.unread_count }}</span>{% endif %}
+        </a>
+      </li>
+    {% empty %}
+      <li class="chat-list__empty muted small">No conversations yet. Pick a friend below or visit any student's profile to message them.</li>
+    {% endfor %}
+  </ul>
+
+  {% if friends_without_chat %}
+    <div class="chat-side__friends">
+      <h3 class="muted small">Your friends</h3>
+      <div class="chat-friends-chips">
+        {% for f in friends_without_chat %}
+          <a class="chip" href="{% url 'accounts:chat_thread' f.username %}">{% avatar f "xs" %} {{ f.name }}</a>
+        {% endfor %}
+      </div>
+    </div>
+  {% endif %}
+{% endif %}

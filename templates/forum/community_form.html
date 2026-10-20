@@ -1,0 +1,18 @@
+{% extends "base.html" %}
+{% block title %}{% if community %}Edit c/{{ community.slug }}{% else %}Create a community{% endif %} · {{ SITE_NAME }}{% endblock %}
+{% block content %}
+<div class="narrow">
+  <div class="card form-card">
+    <h1>{% if community %}Edit c/{{ community.slug }}{% else %}Create a community{% endif %}</h1>
+    {% if not community %}<p class="muted">Communities are spaces for a course, a club or a shared interest. You'll be its first moderator.</p>{% endif %}
+    <form method="post" novalidate>
+      {% csrf_token %}
+      {% include "components/form.html" %}
+      <div class="form-actions">
+        <a class="btn btn--ghost" href="{% if community %}{{ community.get_absolute_url }}{% else %}{% url 'forum:community_list' %}{% endif %}">Cancel</a>
+        <button class="btn btn--primary" type="submit">{% if community %}Save changes{% else %}Create community{% endif %}</button>
+      </div>
+    </form>
+  </div>
+</div>
+{% endblock %}

@@ -1,0 +1,55 @@
+{% extends "base.html" %}
+{% load forum_extras %}
+{% block title %}{{ profile_user.name }} (@{{ profile_user.username }}) · {{ SITE_NAME }}{% endblock %}
+{% block content %}
+<section class="card profile">
+  <div class="profile__banner{% if profile_user.banner %} has-image{% else %} banner--{{ profile_user.banner_theme }}{% endif %}">
+    {% if profile_user.banner %}<img src="{{ profile_user.banner.url }}" alt="" width="1500" height="500">{% endif %}
+  </div>
+  <div class="profile__main">
+    <div class="profile__avatar">{% avatar profile_user "xl" %}</div>
+    <div class="profile__identity">
+      <h1>{{ profile_user.name }}</h1>
+      <p class="muted">@{{ profile_user.username }}
+        {% if profile_user.field_of_study %} · {{ profile_user.field_of_study }}{% endif %}
+        {% if profile_user.year_of_study %} · {{ profile_user.get_year_of_study_display }}{% endif %}
+      </p>
+    </div>
+    <div class="profile__actions" data-profile-actions="{{ profile_user.username }}">{% include "accounts/_friend_actions.html" %}</div>
+  </div>
+  {% if profile_user.bio %}<div class="profile__bio">{{ profile_user.bio|linebreaksbr }}</div>{% endif %}
+  <ul class="profile__stats">
+    <li><strong>{{ stats.threads }}</strong> thread{{ stats.threads|pluralize }}</li>
+    <li><strong>{{ stats.comments }}</strong> comment{{ stats.comments|pluralize }}</li>
+    <li data-profile-friends-stat><strong>{{ stats.friends }}</strong> friend{{ stats.friends|pluralize }}</li>
+    <li class="muted">Joined {{ profile_user.date_joined|date:"F Y" }}</li>
+  </ul>
+</section>
+
+<nav class="tabs tabs--underline" aria-label="Profile sections">
+  <a class="tabs__item{% if tab == 'threads' %} is-active{% endif %}" href="?tab=threads">Threads</a>
+  <a class="tabs__item{% if tab == 'comments' %} is-active{% endif %}" href="?tab=comments">Comments</a>
+  <a class="tabs__item{% if tab == 'friends' %} is-active{% endif %}" href="?tab=friends">Friends</a>
+</nav>
+
+{% if tab == "threads" %}
+  {% for thread in page %}{% include "forum/_thread_card.html" %}{% empty %}<div class="empty card"><p class="muted">No threads yet.</p></div>{% endfor %}
+{% elif tab == "comments" %}
+  {% for comment in page %}
+    <article class="card comment-card">
+      <div class="meta">
+        <span>on <a href="{{ comment.get_absolute_url }}">{{ comment.thread.title|truncatechars:80 }}</a></span>
+        <span aria-hidden="true">·</span><a class="chip" href="{{ comment.thread.community.get_absolute_url }}">c/{{ comment.thread.community.slug }}</a>
+        <span aria-hidden="true">·</span><time datetime="{{ comment.created_at|date:'c' }}">{{ comment.created_at|timesince }} ago</time>
+        <span aria-hidden="true">·</span><span>{{ comment.score }} point{{ comment.score|pluralize }}</span>
+      </div>
+      <div class="prose">{{ comment.body|truncatechars:400|render_body }}</div>
+    </article>
+  {% empty %}<div class="empty card"><p class="muted">No comments yet.</p></div>{% endfor %}
+{% else %}
+  <div class="grid grid--people">
+    {% for friend in page %}{% include "accounts/_user_card.html" with person=friend %}{% empty %}<div class="empty card"><p class="muted">No friends yet.</p></div>{% endfor %}
+  </div>
+{% endif %}
+{% include "components/pagination.html" %}
+{% endblock %}

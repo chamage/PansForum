@@ -1,0 +1,12 @@
+{% extends "accounts/settings_base.html" %}
+{% block settings %}
+<h1>Delete account</h1>
+<div class="alert alert--error">
+  <p><strong>This can't be undone.</strong> Your profile, avatar, friends and votes will be removed. Your threads and comments will stay but show as <em>[deleted]</em>.</p>
+</div>
+<form method="post" novalidate data-confirm="Really delete your account permanently?">
+  {% csrf_token %}
+  {% include "components/form.html" %}
+  <div class="form-actions"><button class="btn btn--danger" type="submit">Delete my account</button></div>
+</form>
+{% endblock %}

@@ -1,0 +1,11 @@
+{% load forum_extras %}<form method="post" action="{% if kind == 'thread' %}{% url 'forum:thread_vote' obj.pk %}{% else %}{% url 'forum:comment_vote' obj.pk %}{% endif %}" class="vote{% if inline %} vote--inline{% endif %}" data-vote-form>
+  {% csrf_token %}
+  <input type="hidden" name="next" value="{{ request.get_full_path }}">
+  <button type="submit" name="value" value="1" class="vote__btn vote__btn--up{% if vote == 1 %} is-active{% endif %}" aria-label="Upvote" aria-pressed="{% if vote == 1 %}true{% else %}false{% endif %}">
+    <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5 5 13h4.5v6h5v-6H19z"/></svg>
+  </button>
+  <span class="vote__score" data-score>{{ obj.score }}</span>
+  <button type="submit" name="value" value="-1" class="vote__btn vote__btn--down{% if vote == -1 %} is-active{% endif %}" aria-label="Downvote" aria-pressed="{% if vote == -1 %}true{% else %}false{% endif %}">
+    <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 19 5 11h4.5V5h5v6H19z"/></svg>
+  </button>
+</form>

@@ -1,0 +1,63 @@
+{% load forum_extras %}
+<article class="card thread" data-thread-id="{{ thread.pk }}">
+  {% include "forum/_vote.html" with kind="thread" obj=thread vote=votes|get_item:thread.pk %}
+  <div class="thread__body">
+    <div class="meta">
+      {% avatar thread.author "xs" %}
+      <span>{% user_link thread.author %}</span>
+      <span aria-hidden="true">·</span>
+      <time datetime="{{ thread.created_at|date:'c' }}" title="{{ thread.created_at }}">{{ thread.created_at|timesince }} ago</time>
+      {% if thread.edited_at %}<span class="muted" title="{{ thread.edited_at }}">· edited</span>{% endif %}
+      {% if thread.is_pinned %}<span class="tag tag--pin">Pinned</span>{% endif %}
+      {% if thread.is_locked %}<span class="tag tag--lock">Locked</span>{% endif %}
+    </div>
+    <h1 class="thread__title" data-thread-title="{{ thread.pk }}">{{ thread.title }}</h1>
+    {% if thread.body %}<div class="prose" data-thread-body="{{ thread.pk }}">{{ thread.body|render_body }}</div>{% endif %}
+
+    <div class="actions">
+      <span class="pill">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 5h16v11H8l-4 4z"/></svg>
+        <span data-thread-comment-count="{{ thread.pk }}">{{ thread.comment_count }} comment{{ thread.comment_count|pluralize }}</span>
+      </span>
+      {% if user.is_authenticated %}
+        {% if thread.author_id == user.pk %}
+          <a class="action" href="{% url 'forum:thread_edit' thread.pk %}">Edit</a>
+        {% endif %}
+        {% if thread.author_id == user.pk or is_mod %}
+          <form method="post" action="{% url 'forum:thread_delete' thread.pk %}" class="inline" data-confirm="Delete this thread and all its comments? This can't be undone.">
+            {% csrf_token %}<button type="submit" class="action action--danger">Delete</button>
+          </form>
+        {% endif %}
+        {% if is_mod %}
+          <form method="post" action="{% url 'forum:thread_pin' thread.pk %}" class="inline">{% csrf_token %}<button type="submit" class="action">{% if thread.is_pinned %}Unpin{% else %}Pin{% endif %}</button></form>
+          <form method="post" action="{% url 'forum:thread_lock' thread.pk %}" class="inline">{% csrf_token %}<button type="submit" class="action">{% if thread.is_locked %}Unlock{% else %}Lock{% endif %}</button></form>
+        {% endif %}
+        {% if thread.author_id != user.pk %}
+          <a class="action" href="{% url 'forum:thread_report' thread.pk %}">Report</a>
+        {% endif %}
+      {% endif %}
+    </div>
+  </div>
+</article>
+
+<section id="comments" class="card discussion">
+  {% if thread.is_locked %}
+    <div class="alert alert--info">🔒 This thread is locked. You can read it, but new comments are turned off.</div>
+  {% elif user.is_authenticated %}
+    <form method="post" action="{% url 'forum:comment_create' thread.pk %}" class="comment-form" data-live-comment-form="{{ thread.pk }}">
+      {% csrf_token %}
+      <label class="sr-only" for="id_body">Comment</label>
+      {{ form.body }}
+      <div class="form-actions"><button class="btn btn--primary" type="submit">Comment</button></div>
+    </form>
+  {% else %}
+    <div class="alert alert--info">
+      <a href="{% url 'accounts:login' %}?next={{ thread.get_absolute_url|urlencode }}">Log in</a> or
+      <a href="{% url 'accounts:register' %}">sign up</a> to join the discussion.
+    </div>
+  {% endif %}
+
+  <div data-live-comments="{{ thread.pk }}" data-csort="{{ csort }}">
+    {% include "forum/_comments_section.html" %}
+  </div>
+</section>
