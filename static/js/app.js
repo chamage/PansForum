@@ -15,6 +15,37 @@
   const chatDockPanel = document.getElementById("chat-dock-panel");
   const chatDockLauncher = document.getElementById("chat-dock-launcher");
 
+  const burgerToggle = document.getElementById("burger-toggle");
+  const mobileNav = document.getElementById("mobile-nav");
+  const mobileNavBackdrop = document.getElementById("mobile-nav-backdrop");
+
+  // --------------------------------------------------------------------------
+  // Mobile Burger Menu & Slide-Over Navigation
+  // --------------------------------------------------------------------------
+  function openMobileNav() {
+    if (!mobileNav || !burgerToggle) return;
+    mobileNav.hidden = false;
+    if (mobileNavBackdrop) mobileNavBackdrop.hidden = false;
+    burgerToggle.classList.add("is-open");
+    burgerToggle.setAttribute("aria-expanded", "true");
+    document.body.classList.add("has-mobile-nav-open");
+  }
+
+  function closeMobileNav() {
+    if (!mobileNav || !burgerToggle) return;
+    mobileNav.hidden = true;
+    if (mobileNavBackdrop) mobileNavBackdrop.hidden = true;
+    burgerToggle.classList.remove("is-open");
+    burgerToggle.setAttribute("aria-expanded", "false");
+    document.body.classList.remove("has-mobile-nav-open");
+  }
+
+  window.addEventListener("resize", () => {
+    if (window.innerWidth > 768 && mobileNav && !mobileNav.hidden) {
+      closeMobileNav();
+    }
+  });
+
   // --------------------------------------------------------------------------
   // Floating Quick-Chat Dock (Messenger / Reddit style popup)
   // --------------------------------------------------------------------------
@@ -185,10 +216,17 @@
   // Global Keyboard Handler (Esc for drawer, Enter-to-send for chat)
   // --------------------------------------------------------------------------
   document.addEventListener("keydown", (e) => {
-    if (e.key === "Escape" && drawer && !drawer.hidden) {
-      e.preventDefault();
-      closeQuickView();
-      return;
+    if (e.key === "Escape") {
+      if (mobileNav && !mobileNav.hidden) {
+        e.preventDefault();
+        closeMobileNav();
+        return;
+      }
+      if (drawer && !drawer.hidden) {
+        e.preventDefault();
+        closeQuickView();
+        return;
+      }
     }
 
     if (e.key === "Enter" && !e.shiftKey && e.target && e.target.matches(".chat-form textarea")) {
@@ -240,6 +278,23 @@
     if (closeBtn) {
       const toast = closeBtn.closest(".toast");
       if (toast) toast.remove();
+      return;
+    }
+
+    // 1b. Mobile burger menu toggle & close
+    if (e.target.closest("[data-burger-toggle]")) {
+      e.preventDefault();
+      if (mobileNav && !mobileNav.hidden) {
+        closeMobileNav();
+      } else {
+        openMobileNav();
+      }
+      return;
+    }
+
+    if (e.target.closest("[data-burger-close]")) {
+      e.preventDefault();
+      closeMobileNav();
       return;
     }
 
@@ -633,6 +688,11 @@
         setBadgeCount("[data-live-messages-badge]", data.unread_messages);
       }
 
+      const totalUnread = (Number(prevPendingFriends) || 0) + (Number(prevUnreadMessages) || 0);
+      document.querySelectorAll("[data-live-burger-dot]").forEach((dot) => {
+        dot.hidden = totalUnread <= 0;
+      });
+
       // B. Update chat sidebar & active conversation
       if (typeof data.chat_sidebar_html === "string") {
         const sidebar = document.getElementById("chat-sidebar");
@@ -906,7 +966,7 @@
       // G. Update open thread state & comments
       if (data.open_thread_deleted || data.open_thread_banned) {
         if (drawer && !drawer.hidden) {
-          closeDrawer();
+          closeQuickView();
           if (data.open_thread_deleted) showToast("This thread was deleted.", "info");
         } else {
           window.location.reload();
@@ -930,7 +990,7 @@
           } else if (tm.box_state === "locked") {
             boxSlot.innerHTML = `<div class="alert alert--info">🔒 This thread is locked. You can read it, but new comments are turned off.</div>`;
           } else if (drawer && !drawer.hidden && activeDrawerUrl) {
-            openDrawer(activeDrawerUrl);
+            openQuickView(activeDrawerUrl, lastTriggerEl);
           } else {
             window.location.reload();
           }

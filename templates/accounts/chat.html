@@ -3,7 +3,7 @@
 {% block title %}{% if active_partner %}Chat with {{ active_partner.name }} · {% endif %}Messages · {{ SITE_NAME }}{% endblock %}
 {% block chat_dock %}{% endblock %}
 {% block content %}
-<div class="chat-shell card" data-chat-shell data-chat-tab="{{ tab }}" data-chat-partner="{% if active_partner %}{{ active_partner.username }}{% endif %}" data-active-partner="{% if active_partner %}{{ active_partner.username }}{% endif %}">
+<div class="chat-shell card{% if active_partner %} has-active-partner{% endif %}" data-chat-shell data-chat-tab="{{ tab }}" data-chat-partner="{% if active_partner %}{{ active_partner.username }}{% endif %}" data-active-partner="{% if active_partner %}{{ active_partner.username }}{% endif %}">
   <!-- Left sidebar: Inbox & Message Requests -->
   <aside class="chat-side" id="chat-sidebar">
     {% include "accounts/_chat_sidebar.html" %}
@@ -13,15 +13,18 @@
   <section class="chat-main">
     {% if active_partner %}
       <header class="chat-main__head">
-        <a class="chat-main__partner" href="{{ active_partner.get_absolute_url }}">
-          {% avatar active_partner "md" %}
-          <div>
-            <strong>{{ active_partner.name }}</strong>
-            <span class="muted small">@{{ active_partner.username }}
-              <span id="chat-friend-badge" {% if not is_friends %}hidden{% endif %}> · <span class="tag tag--pin">✓ Friends — free DM</span></span>
-            </span>
-          </div>
-        </a>
+        <div class="chat-main__head-left">
+          <a class="btn btn--ghost btn--sm chat-main__back" href="{% url 'accounts:chat_inbox' %}" aria-label="Back to conversations">←</a>
+          <a class="chat-main__partner" href="{{ active_partner.get_absolute_url }}">
+            {% avatar active_partner "md" %}
+            <div>
+              <strong>{{ active_partner.name }}</strong>
+              <span class="muted small">@{{ active_partner.username }}
+                <span id="chat-friend-badge" {% if not is_friends %}hidden{% endif %}> · <span class="tag tag--pin">✓ Friends — free DM</span></span>
+              </span>
+            </div>
+          </a>
+        </div>
         <a class="btn btn--ghost btn--sm" href="{{ active_partner.get_absolute_url }}">View profile</a>
       </header>
 
