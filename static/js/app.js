@@ -217,6 +217,11 @@
   // --------------------------------------------------------------------------
   document.addEventListener("keydown", (e) => {
     if (e.key === "Escape") {
+      if (cropModal && !cropModal.hidden) {
+        e.preventDefault();
+        closeCropModal(true);
+        return;
+      }
       if (mobileNav && !mobileNav.hidden) {
         e.preventDefault();
         closeMobileNav();
@@ -1405,19 +1410,324 @@
   });
 
   // --------------------------------------------------------------------------
-  // Live image preview on profile settings page
+  // Discord-Style Interactive Image Cropper & Positioner (Avatar & Banner)
   // --------------------------------------------------------------------------
+  const cropModal = document.getElementById("image-crop-modal");
+  const cropModalTitle = document.getElementById("crop-modal-title");
+  const cropCanvas = document.getElementById("crop-canvas");
+  const cropZoomSlider = document.getElementById("crop-zoom");
+  const cropCtx = cropCanvas ? cropCanvas.getContext("2d") : null;
+
+  const savedCropState = { avatar: null, banner: null };
+  let activeCrop = null; // { kind, inputEl, img, zoom, offsetX, offsetY, isNewSelection }
+  let cropDragging = false;
+  let cropDragStart = { x: 0, y: 0, ox: 0, oy: 0 };
+
+  function getCropFrame(kind) {
+    const cw = cropCanvas ? cropCanvas.width : 540;
+    const ch = cropCanvas ? cropCanvas.height : 340;
+    if (kind === "banner") {
+      const fw = 480;
+      const fh = 160;
+      return { cw, ch, fx: (cw - fw) / 2, fy: (ch - fh) / 2, fw, fh, circle: false };
+    }
+    const fw = 240;
+    const fh = 240;
+    return { cw, ch, fx: (cw - fw) / 2, fy: (ch - fh) / 2, fw, fh, circle: true };
+  }
+
+  function clampCropOffsets(state) {
+    if (!state || !state.img) return;
+    const f = getCropFrame(state.kind);
+    const natW = state.img.naturalWidth || state.img.width || 1;
+    const natH = state.img.naturalHeight || state.img.height || 1;
+    const baseScale = Math.max(f.fw / natW, f.fh / natH);
+    const dispW = natW * baseScale * state.zoom;
+    const dispH = natH * baseScale * state.zoom;
+    const maxPanX = Math.max(0, (dispW - f.fw) / 2);
+    const maxPanY = Math.max(0, (dispH - f.fh) / 2);
+    state.offsetX = Math.max(-maxPanX, Math.min(maxPanX, state.offsetX));
+    state.offsetY = Math.max(-maxPanY, Math.min(maxPanY, state.offsetY));
+  }
+
+  function drawCropCanvas() {
+    if (!cropCtx || !cropCanvas || !activeCrop || !activeCrop.img) return;
+    clampCropOffsets(activeCrop);
+    const f = getCropFrame(activeCrop.kind);
+    const natW = activeCrop.img.naturalWidth || activeCrop.img.width || 1;
+    const natH = activeCrop.img.naturalHeight || activeCrop.img.height || 1;
+    const baseScale = Math.max(f.fw / natW, f.fh / natH);
+    const dispW = natW * baseScale * activeCrop.zoom;
+    const dispH = natH * baseScale * activeCrop.zoom;
+    const imgX = f.fx + (f.fw - dispW) / 2 + activeCrop.offsetX;
+    const imgY = f.fy + (f.fh - dispH) / 2 + activeCrop.offsetY;
+
+    cropCtx.clearRect(0, 0, f.cw, f.ch);
+    cropCtx.fillStyle = "#111412";
+    cropCtx.fillRect(0, 0, f.cw, f.ch);
+
+    // 1. Draw full image dimmed in background
+    cropCtx.save();
+    cropCtx.globalAlpha = 0.32;
+    cropCtx.drawImage(activeCrop.img, imgX, imgY, dispW, dispH);
+    cropCtx.restore();
+
+    // 2. Draw crisp image clipped inside the crop cutout frame
+    cropCtx.save();
+    cropCtx.beginPath();
+    if (f.circle) {
+      cropCtx.arc(f.fx + f.fw / 2, f.fy + f.fh / 2, f.fw / 2, 0, Math.PI * 2);
+    } else {
+      cropCtx.rect(f.fx, f.fy, f.fw, f.fh);
+    }
+    cropCtx.clip();
+    cropCtx.drawImage(activeCrop.img, imgX, imgY, dispW, dispH);
+
+    // Rule-of-thirds guide lines while dragging
+    if (cropDragging) {
+      cropCtx.strokeStyle = "rgba(255, 255, 255, 0.32)";
+      cropCtx.lineWidth = 1;
+      for (let i = 1; i <= 2; i++) {
+        const gx = f.fx + (f.fw * i) / 3;
+        const gy = f.fy + (f.fh * i) / 3;
+        cropCtx.beginPath();
+        cropCtx.moveTo(gx, f.fy);
+        cropCtx.lineTo(gx, f.fy + f.fh);
+        cropCtx.moveTo(f.fx, gy);
+        cropCtx.lineTo(f.fx + f.fw, gy);
+        cropCtx.stroke();
+      }
+    }
+    cropCtx.restore();
+
+    // 3. Draw crisp cutout frame border
+    cropCtx.save();
+    cropCtx.strokeStyle = "rgba(255, 255, 255, 0.92)";
+    cropCtx.lineWidth = 2.5;
+    cropCtx.beginPath();
+    if (f.circle) {
+      cropCtx.arc(f.fx + f.fw / 2, f.fy + f.fh / 2, f.fw / 2, 0, Math.PI * 2);
+    } else {
+      cropCtx.strokeRect(f.fx, f.fy, f.fw, f.fh);
+    }
+    cropCtx.stroke();
+    cropCtx.restore();
+  }
+
+  function openCropModal(kind, inputEl, img, initialZoom, initialOx, initialOy, isNewSelection) {
+    if (!cropModal || !cropCanvas) return;
+    activeCrop = {
+      kind,
+      inputEl,
+      img,
+      zoom: initialZoom || 1,
+      offsetX: initialOx || 0,
+      offsetY: initialOy || 0,
+      isNewSelection: Boolean(isNewSelection),
+    };
+    if (cropModalTitle) {
+      cropModalTitle.textContent = kind === "banner" ? "Edit Banner" : "Edit Avatar";
+    }
+    if (cropZoomSlider) {
+      cropZoomSlider.value = String(activeCrop.zoom);
+    }
+    cropModal.hidden = false;
+    document.body.classList.add("has-crop-modal-open");
+    drawCropCanvas();
+  }
+
+  function closeCropModal(cancelled) {
+    if (!cropModal) return;
+    if (cancelled && activeCrop && activeCrop.isNewSelection && !savedCropState[activeCrop.kind]) {
+      if (activeCrop.inputEl) activeCrop.inputEl.value = "";
+    }
+    cropModal.hidden = true;
+    document.body.classList.remove("has-crop-modal-open");
+    activeCrop = null;
+    cropDragging = false;
+  }
+
+  function applyCropModal() {
+    if (!activeCrop || !activeCrop.img) return;
+    clampCropOffsets(activeCrop);
+    const f = getCropFrame(activeCrop.kind);
+    const natW = activeCrop.img.naturalWidth || activeCrop.img.width || 1;
+    const natH = activeCrop.img.naturalHeight || activeCrop.img.height || 1;
+    const baseScale = Math.max(f.fw / natW, f.fh / natH);
+    const scale = baseScale * activeCrop.zoom;
+    const dispW = natW * scale;
+    const dispH = natH * scale;
+    const imgX = f.fx + (f.fw - dispW) / 2 + activeCrop.offsetX;
+    const imgY = f.fy + (f.fh - dispH) / 2 + activeCrop.offsetY;
+
+    const srcX = Math.max(0, (f.fx - imgX) / scale);
+    const srcY = Math.max(0, (f.fy - imgY) / scale);
+    const srcW = Math.min(natW - srcX, f.fw / scale);
+    const srcH = Math.min(natH - srcY, f.fh / scale);
+
+    const nx = Math.max(0, Math.min(1, srcX / natW));
+    const ny = Math.max(0, Math.min(1, srcY / natH));
+    const nw = Math.max(0.01, Math.min(1 - nx, srcW / natW));
+    const nh = Math.max(0.01, Math.min(1 - ny, srcH / natH));
+
+    const cropInput = document.getElementById(activeCrop.kind === "banner" ? "id_banner_crop" : "id_avatar_crop");
+    if (cropInput) {
+      cropInput.value = `${nx.toFixed(5)},${ny.toFixed(5)},${nw.toFixed(5)},${nh.toFixed(5)}`;
+    }
+
+    // Render live preview image
+    const outCanvas = document.createElement("canvas");
+    outCanvas.width = activeCrop.kind === "banner" ? 900 : 256;
+    outCanvas.height = activeCrop.kind === "banner" ? 300 : 256;
+    const outCtx = outCanvas.getContext("2d");
+    if (outCtx) {
+      outCtx.drawImage(activeCrop.img, srcX, srcY, srcW, srcH, 0, 0, outCanvas.width, outCanvas.height);
+      const previewId = activeCrop.inputEl ? activeCrop.inputEl.dataset.preview : "";
+      const target = previewId ? document.getElementById(previewId) : null;
+      if (target) {
+        target.src = outCanvas.toDataURL("image/png");
+        target.classList.remove("is-empty");
+        const fallback = target.parentElement.querySelector("[data-avatar-fallback]");
+        if (fallback) fallback.style.display = "none";
+      }
+    }
+
+    savedCropState[activeCrop.kind] = {
+      inputEl: activeCrop.inputEl,
+      img: activeCrop.img,
+      zoom: activeCrop.zoom,
+      offsetX: activeCrop.offsetX,
+      offsetY: activeCrop.offsetY,
+    };
+
+    const reopenBar = document.getElementById(
+      activeCrop.kind === "banner" ? "banner-crop-bar" : "avatar-crop-bar"
+    );
+    if (reopenBar) reopenBar.hidden = false;
+
+    closeCropModal(false);
+  }
+
   document.querySelectorAll("input[type='file'][data-preview]").forEach((input) => {
     input.addEventListener("change", () => {
       const file = input.files && input.files[0];
-      const target = document.getElementById(input.dataset.preview);
-      if (!file || !target) return;
+      if (!file) return;
+      const kind = input.dataset.cropKind || (input.dataset.preview === "banner-preview" ? "banner" : "avatar");
       const url = URL.createObjectURL(file);
-      target.src = url;
-      target.classList.remove("is-empty");
-      const fallback = target.parentElement.querySelector("[data-avatar-fallback]");
-      if (fallback) fallback.style.display = "none";
+      const img = new Image();
+      img.onload = () => {
+        if (cropModal && cropCanvas) {
+          openCropModal(kind, input, img, 1, 0, 0, true);
+        } else {
+          const target = document.getElementById(input.dataset.preview);
+          if (target) {
+            target.src = url;
+            target.classList.remove("is-empty");
+          }
+        }
+      };
+      img.src = url;
     });
+  });
+
+  if (cropCanvas) {
+    cropCanvas.addEventListener("pointerdown", (e) => {
+      if (!activeCrop) return;
+      cropDragging = true;
+      cropCanvas.setPointerCapture(e.pointerId);
+      cropDragStart = {
+        x: e.clientX,
+        y: e.clientY,
+        ox: activeCrop.offsetX,
+        oy: activeCrop.offsetY,
+      };
+      drawCropCanvas();
+    });
+
+    cropCanvas.addEventListener("pointermove", (e) => {
+      if (!cropDragging || !activeCrop) return;
+      const rect = cropCanvas.getBoundingClientRect();
+      const scaleX = cropCanvas.width / (rect.width || cropCanvas.width);
+      const scaleY = cropCanvas.height / (rect.height || cropCanvas.height);
+      activeCrop.offsetX = cropDragStart.ox + (e.clientX - cropDragStart.x) * scaleX;
+      activeCrop.offsetY = cropDragStart.oy + (e.clientY - cropDragStart.y) * scaleY;
+      drawCropCanvas();
+    });
+
+    const endDrag = () => {
+      if (!cropDragging) return;
+      cropDragging = false;
+      drawCropCanvas();
+    };
+    cropCanvas.addEventListener("pointerup", endDrag);
+    cropCanvas.addEventListener("pointercancel", endDrag);
+
+    cropCanvas.addEventListener(
+      "wheel",
+      (e) => {
+        if (!activeCrop) return;
+        e.preventDefault();
+        const delta = e.deltaY < 0 ? 0.1 : -0.1;
+        activeCrop.zoom = Math.max(1, Math.min(3.5, activeCrop.zoom + delta));
+        if (cropZoomSlider) cropZoomSlider.value = String(activeCrop.zoom);
+        drawCropCanvas();
+      },
+      { passive: false }
+    );
+  }
+
+  if (cropZoomSlider) {
+    cropZoomSlider.addEventListener("input", () => {
+      if (!activeCrop) return;
+      activeCrop.zoom = parseFloat(cropZoomSlider.value) || 1;
+      drawCropCanvas();
+    });
+  }
+
+  document.addEventListener("click", (e) => {
+    const reopenBtn = e.target.closest("[data-reopen-crop]");
+    if (reopenBtn) {
+      e.preventDefault();
+      const kind = reopenBtn.getAttribute("data-reopen-crop");
+      const saved = savedCropState[kind];
+      if (saved && saved.img) {
+        openCropModal(kind, saved.inputEl, saved.img, saved.zoom, saved.offsetX, saved.offsetY, false);
+      }
+      return;
+    }
+
+    if (e.target.closest("[data-crop-apply]")) {
+      e.preventDefault();
+      applyCropModal();
+      return;
+    }
+
+    if (e.target.closest("[data-crop-cancel]")) {
+      e.preventDefault();
+      closeCropModal(true);
+      return;
+    }
+
+    if (e.target.closest("[data-crop-reset]")) {
+      e.preventDefault();
+      if (activeCrop) {
+        activeCrop.zoom = 1;
+        activeCrop.offsetX = 0;
+        activeCrop.offsetY = 0;
+        if (cropZoomSlider) cropZoomSlider.value = "1";
+        drawCropCanvas();
+      }
+      return;
+    }
+
+    const stepBtn = e.target.closest("[data-crop-zoom-step]");
+    if (stepBtn && activeCrop) {
+      e.preventDefault();
+      const step = parseFloat(stepBtn.getAttribute("data-crop-zoom-step")) || 0;
+      activeCrop.zoom = Math.max(1, Math.min(3.5, activeCrop.zoom + step));
+      if (cropZoomSlider) cropZoomSlider.value = String(activeCrop.zoom);
+      drawCropCanvas();
+    }
   });
 
   const bannerBox = document.querySelector("[data-banner-preview]");

@@ -61,14 +61,28 @@ class LoginForm(AuthenticationForm):
 class ProfileForm(forms.ModelForm):
     avatar = forms.ImageField(
         required=False,
-        widget=forms.FileInput(attrs={"accept": "image/jpeg,image/png,image/gif,image/webp", "data-preview": "avatar-preview"}),
-        help_text="Square images look best. JPEG, PNG, GIF or WebP, up to 3 MB.",
+        widget=forms.FileInput(
+            attrs={
+                "accept": "image/jpeg,image/png,image/gif,image/webp",
+                "data-preview": "avatar-preview",
+                "data-crop-kind": "avatar",
+            }
+        ),
+        help_text="Upload an image for your avatar. JPEG, PNG, GIF or WebP, up to 3 MB.",
     )
     banner = forms.ImageField(
         required=False,
-        widget=forms.FileInput(attrs={"accept": "image/jpeg,image/png,image/gif,image/webp", "data-preview": "banner-preview"}),
-        help_text="Wide images work best (3:1). Up to 5 MB.",
+        widget=forms.FileInput(
+            attrs={
+                "accept": "image/jpeg,image/png,image/gif,image/webp",
+                "data-preview": "banner-preview",
+                "data-crop-kind": "banner",
+            }
+        ),
+        help_text="Upload an image for your banner. Drag/zoom to position it (3:1). JPEG, PNG, GIF or WebP, up to 5 MB.",
     )
+    avatar_crop = forms.CharField(required=False, widget=forms.HiddenInput(attrs={"id": "id_avatar_crop"}))
+    banner_crop = forms.CharField(required=False, widget=forms.HiddenInput(attrs={"id": "id_banner_crop"}))
     remove_avatar = forms.BooleanField(required=False, label="Remove current avatar")
     remove_banner = forms.BooleanField(required=False, label="Remove current banner image")
 
@@ -85,13 +99,15 @@ class ProfileForm(forms.ModelForm):
     def clean_avatar(self):
         f = self.cleaned_data.get("avatar")
         if isinstance(f, UploadedFile):
-            return process_image(f, (256, 256), settings.AVATAR_MAX_BYTES)
+            crop = self.data.get("avatar_crop", "")
+            return process_image(f, (256, 256), settings.AVATAR_MAX_BYTES, crop_box=crop)
         return f
 
     def clean_banner(self):
         f = self.cleaned_data.get("banner")
         if isinstance(f, UploadedFile):
-            return process_image(f, (1500, 500), settings.BANNER_MAX_BYTES)
+            crop = self.data.get("banner_crop", "")
+            return process_image(f, (1500, 500), settings.BANNER_MAX_BYTES, crop_box=crop)
         return f
 
     def save(self, commit=True):

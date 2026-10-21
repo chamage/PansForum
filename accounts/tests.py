@@ -89,6 +89,8 @@ class AccountsTests(TestCase):
                 "banner_theme": User.BannerTheme.OCEAN,
                 "avatar": avatar_file,
                 "banner": banner_file,
+                "avatar_crop": "0.10000,0.10000,0.80000,0.80000",
+                "banner_crop": "0.05000,0.15000,0.90000,0.70000",
             },
         )
         self.assertRedirects(resp, reverse("accounts:settings_profile"))

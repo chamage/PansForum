@@ -83,8 +83,28 @@ Image.MAX_IMAGE_PIXELS = 40_000_000  # refuse decompression bombs
 ALLOWED_IMAGE_FORMATS = {"JPEG", "PNG", "GIF", "WEBP"}
 
 
-def process_image(uploaded, size, max_bytes):
-    """Validate an uploaded image and re-encode it as a clean WebP.
+def _parse_crop_box(raw_crop, width, height):
+    """Parse normalized 'x,y,w,h' (0..1) into pixel crop coordinates (left, top, right, bottom)."""
+    if not raw_crop or not isinstance(raw_crop, str):
+        return None
+    try:
+        parts = [float(p) for p in raw_crop.split(",")]
+        if len(parts) != 4:
+            return None
+        nx, ny, nw, nh = parts
+        if nw <= 0 or nh <= 0:
+            return None
+        left = max(0, min(width - 1, int(round(nx * width))))
+        top = max(0, min(height - 1, int(round(ny * height))))
+        right = max(left + 1, min(width, int(round((nx + nw) * width))))
+        bottom = max(top + 1, min(height, int(round((ny + nh) * height))))
+        return (left, top, right, bottom)
+    except (ValueError, TypeError):
+        return None
+
+
+def process_image(uploaded, size, max_bytes, crop_box=None):
+    """Validate an uploaded image, optionally apply user crop coordinates, and re-encode as WebP.
 
     Re-encoding strips EXIF/GPS metadata and any payload hidden in the
     original file, and guarantees a predictable size and format.
@@ -99,7 +119,12 @@ def process_image(uploaded, size, max_bytes):
             img = ImageOps.exif_transpose(img)
             has_alpha = img.mode in ("RGBA", "LA") or (img.mode == "P" and "transparency" in img.info)
             img = img.convert("RGBA" if has_alpha else "RGB")
-            img = ImageOps.fit(img, size, method=Image.Resampling.LANCZOS)
+            parsed_box = _parse_crop_box(crop_box, img.width, img.height)
+            if parsed_box:
+                img = img.crop(parsed_box)
+                img = img.resize(size, resample=Image.Resampling.LANCZOS)
+            else:
+                img = ImageOps.fit(img, size, method=Image.Resampling.LANCZOS)
             buffer = BytesIO()
             img.save(buffer, format="WEBP", quality=85, method=4)
     except (UnidentifiedImageError, Image.DecompressionBombError, OSError, SyntaxError, ValueError):

@@ -2408,6 +2408,116 @@ body.has-mobile-nav-open {
   }
 }
 
+/* ==========================================================================
+   Discord-Style Image Cropper & Positioner Modal (Avatar & Banner)
+   ========================================================================== */
+
+body.has-crop-modal-open {
+  overflow: hidden;
+}
+
+.crop-reopen-bar {
+  margin-top: 0.45rem;
+}
+
+.crop-modal-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 100;
+  background: rgba(10, 14, 12, 0.72);
+  backdrop-filter: blur(4px);
+  -webkit-backdrop-filter: blur(4px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 1rem;
+}
+
+.crop-modal {
+  width: min(560px, 100%);
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  box-shadow: 0 18px 48px rgba(0, 0, 0, 0.45);
+  border: 1px solid var(--border-strong);
+}
+
+.crop-modal__head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0.9rem 1.25rem;
+  border-bottom: 1px solid var(--border);
+  background: var(--surface);
+}
+
+.crop-modal__head h2 {
+  margin: 0;
+  font-size: 1.08rem;
+}
+
+.crop-stage {
+  position: relative;
+  background: #111412;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  user-select: none;
+}
+
+.crop-stage__canvas {
+  display: block;
+  width: 100%;
+  height: auto;
+  cursor: grab;
+  touch-action: none;
+}
+
+.crop-stage__canvas:active {
+  cursor: grabbing;
+}
+
+.crop-stage__hint {
+  position: absolute;
+  bottom: 0.55rem;
+  left: 50%;
+  transform: translateX(-50%);
+  padding: 0.2rem 0.65rem;
+  border-radius: 999px;
+  background: rgba(15, 20, 17, 0.75);
+  color: #e6eae4;
+  font-size: 0.75rem;
+  pointer-events: none;
+  white-space: nowrap;
+}
+
+.crop-controls {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  padding: 0.85rem 1.25rem;
+  background: var(--surface-subtle);
+  border-top: 1px solid var(--border);
+}
+
+.crop-controls__slider {
+  flex: 1;
+  accent-color: var(--accent);
+  cursor: pointer;
+}
+
+.crop-modal__foot {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 0.6rem;
+  padding: 0.85rem 1.25rem;
+  background: var(--surface);
+  border-top: 1px solid var(--border);
+}
+
+
 
 
 

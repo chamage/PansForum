@@ -25,12 +25,20 @@
   <div class="form-grid">
     <fieldset class="fieldset">
       <legend>Avatar</legend>
+      {{ form.avatar_crop }}
       {% include "components/field.html" with field=form.avatar %}
+      <div class="crop-reopen-bar" id="avatar-crop-bar" hidden>
+        <button type="button" class="btn btn--ghost btn--sm" data-reopen-crop="avatar">Reposition / Zoom avatar</button>
+      </div>
       {% if preview_user.avatar %}{% include "components/field.html" with field=form.remove_avatar %}{% endif %}
     </fieldset>
     <fieldset class="fieldset">
       <legend>Banner</legend>
+      {{ form.banner_crop }}
       {% include "components/field.html" with field=form.banner %}
+      <div class="crop-reopen-bar" id="banner-crop-bar" hidden>
+        <button type="button" class="btn btn--ghost btn--sm" data-reopen-crop="banner">Reposition / Zoom banner</button>
+      </div>
       {% if preview_user.banner %}{% include "components/field.html" with field=form.remove_banner %}{% endif %}
     </fieldset>
   </div>
@@ -45,4 +53,31 @@
 
   <div class="form-actions"><button class="btn btn--primary" type="submit">Save profile</button></div>
 </form>
+
+<!-- Discord-style Interactive Image Cropper & Positioner Modal -->
+<div class="crop-modal-backdrop" id="image-crop-modal" role="dialog" aria-modal="true" aria-labelledby="crop-modal-title" hidden>
+  <div class="crop-modal card">
+    <header class="crop-modal__head">
+      <h2 id="crop-modal-title">Edit Image</h2>
+      <button type="button" class="btn btn--ghost btn--sm" data-crop-cancel aria-label="Close">✕</button>
+    </header>
+
+    <div class="crop-stage" id="crop-stage">
+      <canvas class="crop-stage__canvas" id="crop-canvas" width="540" height="340"></canvas>
+      <div class="crop-stage__hint" aria-hidden="true">Drag to reposition · Scroll or slide to zoom</div>
+    </div>
+
+    <div class="crop-controls">
+      <button type="button" class="btn btn--ghost btn--sm" data-crop-zoom-step="-0.15" aria-label="Zoom out">🔍 −</button>
+      <input type="range" class="crop-controls__slider" id="crop-zoom" min="1" max="3.5" step="0.02" value="1" aria-label="Zoom">
+      <button type="button" class="btn btn--ghost btn--sm" data-crop-zoom-step="0.15" aria-label="Zoom in">+</button>
+      <button type="button" class="btn btn--ghost btn--sm" data-crop-reset>Reset</button>
+    </div>
+
+    <footer class="crop-modal__foot">
+      <button type="button" class="btn btn--ghost" data-crop-cancel>Cancel</button>
+      <button type="button" class="btn btn--primary" data-crop-apply>Apply</button>
+    </footer>
+  </div>
+</div>
 {% endblock %}
