@@ -31,9 +31,17 @@ urlpatterns = [
     path("friends/", views.friends, name="friends"),
     path("friends/<int:pk>/accept/", views.friend_accept, name="friend_accept"),
     path("friends/<int:pk>/decline/", views.friend_decline, name="friend_decline"),
-    # Chat / Direct Messages
+    # Chat / Direct Messages & Group Chats
     path("messages/", views.chat_inbox, name="chat_inbox"),
+    path("messages/groups/create/", views.chat_group_create, name="chat_group_create"),
+    path("messages/g/<int:pk>/", views.chat_group, name="chat_group"),
+    path("messages/g/<int:pk>/add-member/", views.chat_group_add_member, name="chat_group_add_member"),
+    path("messages/g/<int:pk>/leave/", views.chat_group_leave, name="chat_group_leave"),
+    path("messages/g/<int:pk>/typing/", views.chat_group_typing, name="chat_group_typing"),
+    path("messages/gm/<int:pk>/edit/", views.chat_group_message_edit, name="chat_group_message_edit"),
+    path("messages/gm/<int:pk>/delete/", views.chat_group_message_delete, name="chat_group_message_delete"),
     path("messages/dock/", views.chat_dock, name="chat_dock"),
+    path("messages/dock/g/<int:pk>/", views.chat_dock_group, name="chat_dock_group"),
     path("messages/dock/<str:username>/", views.chat_dock, name="chat_dock_thread"),
     path("messages/<int:pk>/accept/", views.chat_accept, name="chat_accept"),
     path("messages/<int:pk>/ignore/", views.chat_ignore, name="chat_ignore"),

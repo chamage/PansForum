@@ -1,6 +1,42 @@
 {% load forum_extras %}
-<div class="chat-dock__inner" data-chat-shell data-chat-tab="{{ tab }}" data-chat-partner="{% if active_partner %}{{ active_partner.username }}{% endif %}" data-active-partner="{% if active_partner %}{{ active_partner.username }}{% endif %}">
-  {% if active_partner %}
+<div class="chat-dock__inner" data-chat-shell data-chat-tab="{{ tab }}" data-chat-partner="{% if active_partner %}{{ active_partner.username }}{% endif %}" data-active-partner="{% if active_partner %}{{ active_partner.username }}{% endif %}" data-chat-group="{% if active_group %}{{ active_group.pk }}{% endif %}">
+  {% if active_group %}
+    <header class="chat-dock__head">
+      <div class="chat-dock__head-left">
+        <button type="button" class="btn btn--ghost btn--sm chat-dock__back" data-dock-url="{% url 'accounts:chat_dock' %}" title="Back to conversations" aria-label="Back to conversations">←</button>
+        <div class="chat-dock__partner">
+          <span class="avatar avatar--xs avatar--group" aria-hidden="true">{{ active_group.initial }}</span>
+          <div class="chat-dock__partner-info">
+            <strong>{{ active_group.name }}</strong>
+            <span class="muted small" data-group-member-count>{{ group_members|length }} member{{ group_members|length|pluralize }}</span>
+          </div>
+        </div>
+      </div>
+      <div class="chat-dock__head-actions">
+        <a class="btn btn--ghost btn--sm" href="{% url 'accounts:chat_group' active_group.pk %}" data-dock-full title="Open full group chat" aria-label="Open full group chat">↗</a>
+        <button type="button" class="btn btn--ghost btn--sm" data-dock-close title="Minimize chat" aria-label="Minimize chat">—</button>
+      </div>
+    </header>
+
+    <div class="chat-log chat-log--dock" id="chat-log">
+      {% if chat_messages %}
+        {% include "accounts/_chat_bubbles.html" %}
+      {% else %}
+        <div class="chat-empty muted" data-chat-empty>
+          <p>Welcome to <strong>{{ active_group.name }}</strong> 👋</p>
+        </div>
+      {% endif %}
+    </div>
+
+    <div class="chat-typing muted small" id="chat-typing-indicator" aria-live="polite" hidden>
+      <span class="chat-typing__dots" aria-hidden="true"><span></span><span></span><span></span></span>
+      <span data-chat-typing-text>Someone is typing…</span>
+    </div>
+
+    <footer class="chat-main__foot chat-dock__foot" id="chat-foot-slot">
+      {% include "accounts/_chat_foot.html" %}
+    </footer>
+  {% elif active_partner %}
     <header class="chat-dock__head">
       <div class="chat-dock__head-left">
         <button type="button" class="btn btn--ghost btn--sm chat-dock__back" data-dock-url="{% url 'accounts:chat_dock' %}" title="Back to conversations" aria-label="Back to conversations">←</button>
@@ -34,7 +70,7 @@
 
     <div class="chat-typing muted small" id="chat-typing-indicator" aria-live="polite" hidden>
       <span class="chat-typing__dots" aria-hidden="true"><span></span><span></span><span></span></span>
-      <span><strong>{{ active_partner.name }}</strong> is typing…</span>
+      <span data-chat-typing-text><strong>{{ active_partner.name }}</strong> is typing…</span>
     </div>
 
     <footer class="chat-main__foot chat-dock__foot" id="chat-foot-slot">

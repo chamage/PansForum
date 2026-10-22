@@ -1,12 +1,46 @@
 {% load forum_extras %}
 <div class="chat-side__head">
-  <h1>Messages</h1>
+  <div class="chat-side__title-row">
+    <h1>Messages</h1>
+  </div>
   <div class="segmented">
     <a href="{% url 'accounts:chat_inbox' %}" class="{% if tab == 'inbox' %}is-active{% endif %}">Inbox</a>
+    <a href="{% url 'accounts:chat_inbox' %}?tab=groups" class="{% if tab == 'groups' %}is-active{% endif %}">
+      Groups{% if groups %} <span class="badge badge--subtle">{{ groups|length }}</span>{% endif %}
+    </a>
     <a href="{% url 'accounts:chat_inbox' %}?tab=requests" class="{% if tab == 'requests' %}is-active{% endif %}">
       Requests{% if requests %} <span class="badge">{{ requests|length }}</span>{% endif %}
     </a>
   </div>
+
+  <details class="chat-new-group" {% if tab == 'groups' and not groups %}open{% endif %}>
+    <summary class="btn btn--ghost btn--sm chat-new-group__toggle">＋ New group chat</summary>
+    <form method="post" action="{% url 'accounts:chat_group_create' %}" class="chat-new-group__form" data-chat-action>
+      {% csrf_token %}
+      <div class="field">
+        <label class="sr-only" for="id_new_group_name">Group name</label>
+        <input type="text" name="name" id="id_new_group_name" maxlength="80" placeholder="Group name (e.g. CS Study Group)" required>
+      </div>
+      {% if friends_without_chat %}
+        <div class="chat-new-group__friends">
+          <span class="muted small">Select friends to add:</span>
+          <div class="chat-new-group__chips">
+            {% for f in friends_without_chat %}
+              <label class="chip chip--check">
+                <input type="checkbox" name="members" value="{{ f.pk }}">
+                {% avatar f "xs" %} <span>{{ f.name }}</span>
+              </label>
+            {% endfor %}
+          </div>
+        </div>
+      {% endif %}
+      <div class="field">
+        <label class="sr-only" for="id_new_group_users">Invite by username</label>
+        <input type="text" name="usernames" id="id_new_group_users" placeholder="Or type @usernames (comma separated)">
+      </div>
+      <button type="submit" class="btn btn--primary btn--sm btn--block">Create group</button>
+    </form>
+  </details>
 </div>
 
 {% if tab == "requests" %}
@@ -31,8 +65,55 @@
       <li class="chat-list__empty muted small">No pending message requests from non-friends.</li>
     {% endfor %}
   </ul>
+{% elif tab == "groups" %}
+  <ul class="chat-list">
+    {% for grp in groups %}
+      <li>
+        <a href="{% url 'accounts:chat_group' grp.pk %}" class="chat-list__item{% if active_group and active_group.pk == grp.pk %} is-active{% endif %}">
+          <span class="avatar avatar--md avatar--group" aria-hidden="true">{{ grp.initial }}</span>
+          <div class="chat-list__body">
+            <div class="chat-list__top">
+              <strong>{{ grp.name }}</strong>
+              <span class="tag tag--pin">{{ grp.member_count }} member{{ grp.member_count|pluralize }}</span>
+            </div>
+            <p class="chat-list__preview muted">
+              {% if grp.last_message %}
+                {% if grp.last_message.sender_id == user.pk %}You: {% else %}{{ grp.last_message.sender.name }}: {% endif %}{{ grp.last_message.preview_text|truncatechars:42 }}
+              {% else %}
+                No messages yet
+              {% endif %}
+            </p>
+          </div>
+          {% if grp.unread_count %}<span class="badge">{{ grp.unread_count }}</span>{% endif %}
+        </a>
+      </li>
+    {% empty %}
+      <li class="chat-list__empty muted small">You aren't in any group chats yet. Use <strong>＋ New group chat</strong> above to start one.</li>
+    {% endfor %}
+  </ul>
 {% else %}
   <ul class="chat-list">
+    {% for grp in groups %}
+      <li>
+        <a href="{% url 'accounts:chat_group' grp.pk %}" class="chat-list__item{% if active_group and active_group.pk == grp.pk %} is-active{% endif %}">
+          <span class="avatar avatar--md avatar--group" aria-hidden="true">{{ grp.initial }}</span>
+          <div class="chat-list__body">
+            <div class="chat-list__top">
+              <strong>{{ grp.name }}</strong>
+              <span class="tag tag--pin">Group · {{ grp.member_count }}</span>
+            </div>
+            <p class="chat-list__preview muted">
+              {% if grp.last_message %}
+                {% if grp.last_message.sender_id == user.pk %}You: {% else %}{{ grp.last_message.sender.name }}: {% endif %}{{ grp.last_message.preview_text|truncatechars:42 }}
+              {% else %}
+                Group chat created
+              {% endif %}
+            </p>
+          </div>
+          {% if grp.unread_count %}<span class="badge">{{ grp.unread_count }}</span>{% endif %}
+        </a>
+      </li>
+    {% endfor %}
     {% for conv in inbox %}
       <li>
         <a href="{% url 'accounts:chat_thread' conv.partner.username %}" class="chat-list__item{% if active_partner and active_partner.pk == conv.partner.pk %} is-active{% endif %}">
@@ -58,7 +139,9 @@
         </a>
       </li>
     {% empty %}
-      <li class="chat-list__empty muted small">No conversations yet. Pick a friend below or visit any student's profile to message them.</li>
+      {% if not groups %}
+        <li class="chat-list__empty muted small">No conversations yet. Pick a friend below, create a group above, or visit any student's profile to message them.</li>
+      {% endif %}
     {% endfor %}
   </ul>
 

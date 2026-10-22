@@ -208,4 +208,86 @@ class DirectMessage(models.Model):
         return "Message"
 
 
+class ChatGroup(models.Model):
+    name = models.CharField(max_length=80)
+    created_by = models.ForeignKey(
+        User, null=True, blank=True, on_delete=models.SET_NULL, related_name="created_chat_groups"
+    )
+    members = models.ManyToManyField(User, through="ChatGroupMember", related_name="chat_groups")
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(default=timezone.now, db_index=True)
+
+    class Meta:
+        ordering = ["-updated_at"]
+
+    def __str__(self):
+        return f"Group: {self.name}"
+
+    @property
+    def initial(self):
+        return (self.name[:1] or "#").upper()
+
+    def get_absolute_url(self):
+        return reverse("accounts:chat_group", args=[self.pk])
+
+    def is_member(self, user):
+        if not user.is_authenticated:
+            return False
+        return self.memberships.filter(user=user).exists()
+
+
+class ChatGroupMember(models.Model):
+    group = models.ForeignKey(ChatGroup, on_delete=models.CASCADE, related_name="memberships")
+    user = models.ForeignKey(User, on_delete=models.CASCADE, related_name="chat_group_memberships")
+    joined_at = models.DateTimeField(auto_now_add=True)
+    last_read_at = models.DateTimeField(default=timezone.now)
+
+    class Meta:
+        ordering = ["joined_at"]
+        constraints = [
+            models.UniqueConstraint(fields=["group", "user"], name="unique_chat_group_member"),
+        ]
+
+    def __str__(self):
+        return f"{self.user} in {self.group}"
+
+
+class GroupMessage(models.Model):
+    EDIT_WINDOW_SECONDS = 15 * 60  # 15 minutes after sending
+
+    group = models.ForeignKey(ChatGroup, on_delete=models.CASCADE, related_name="messages")
+    sender = models.ForeignKey(User, on_delete=models.CASCADE, related_name="sent_group_messages")
+    body = models.TextField(max_length=4000, blank=True)
+    attachment = models.FileField(upload_to=chat_media_upload_to, blank=True)
+    is_deleted = models.BooleanField(default=False)
+    edited_at = models.DateTimeField(null=True, blank=True)
+    created_at = models.DateTimeField(default=timezone.now, db_index=True)
+
+    class Meta:
+        ordering = ["created_at", "pk"]
+        indexes = [models.Index(fields=["group", "created_at"])]
+
+    def __str__(self):
+        return f"GroupMsg {self.pk} in {self.group_id} from {self.sender}"
+
+    @property
+    def can_edit(self):
+        if self.is_deleted:
+            return False
+        return (timezone.now() - self.created_at).total_seconds() <= self.EDIT_WINDOW_SECONDS
+
+    @property
+    def can_delete(self):
+        return not self.is_deleted
+
+    def preview_text(self):
+        if self.is_deleted:
+            return "Message deleted"
+        if self.body:
+            return self.body
+        if self.attachment:
+            return "📷 Photo / media"
+        return "Message"
+
+
 

@@ -20,6 +20,7 @@ from forum.models import Comment, CommentVote, Community, CommunitySanction, Mem
 from forum.templatetags.forum_extras import render_body
 from pans_agora.utils import ratelimit, safe_next
 
+from .context_processors import count_unread_messages
 from .forms import (
     DeleteAccountForm,
     DirectMessageForm,
@@ -28,7 +29,16 @@ from .forms import (
     ProfileForm,
     RegistrationForm,
 )
-from .models import Conversation, DirectMessage, FriendRequest, User, relationship
+from .models import (
+    ChatGroup,
+    ChatGroupMember,
+    Conversation,
+    DirectMessage,
+    FriendRequest,
+    GroupMessage,
+    User,
+    relationship,
+)
 
 # ---------------------------------------------------------------------------
 # Registration & authentication
@@ -321,6 +331,76 @@ def _build_conversation_lists(user):
     return inbox, requests
 
 
+def _build_group_list(user):
+    """Return list of ChatGroup objects the user belongs to, decorated with last_message, unread_count & member_count."""
+    memberships = list(
+        ChatGroupMember.objects.filter(user=user)
+        .select_related("group", "group__created_by")
+        .order_by("-group__updated_at")
+    )
+    groups = []
+    for m in memberships:
+        g = m.group
+        g.last_message = g.messages.select_related("sender").order_by("-created_at", "-pk").first()
+        g.unread_count = (
+            g.messages.filter(created_at__gt=m.last_read_at, is_deleted=False)
+            .exclude(sender=user)
+            .count()
+        )
+        g.member_count = g.memberships.count()
+        groups.append(g)
+    return groups
+
+
+def _chat_sidebar_context(user, tab="inbox", active_partner=None, active_group=None):
+    inbox, requests_list = _build_conversation_lists(user)
+    groups = _build_group_list(user)
+    if tab not in ("inbox", "groups", "requests"):
+        tab = "inbox"
+    return {
+        "inbox": inbox,
+        "requests": requests_list,
+        "groups": groups,
+        "tab": tab,
+        "active_partner": active_partner,
+        "active_group": active_group,
+        "friends_without_chat": user.friends().order_by("username"),
+    }
+
+
+def _resolve_invited_users(request, exclude_user=None):
+    """Resolve active Users from POST 'members' (IDs or usernames) and 'usernames' (comma/space separated)."""
+    found = {}
+    raw_members = request.POST.getlist("members")
+    ids = []
+    names = []
+    for item in raw_members:
+        val = (item or "").strip().lstrip("@")
+        if not val:
+            continue
+        if val.isdigit():
+            ids.append(int(val))
+        else:
+            names.append(val)
+
+    raw_usernames = (request.POST.get("usernames") or "") + "," + (request.POST.get("username") or "")
+    for token in raw_usernames.replace(",", " ").split():
+        uname = token.strip().lstrip("@")
+        if uname:
+            names.append(uname)
+
+    if ids:
+        for u in User.objects.filter(pk__in=ids, is_active=True):
+            if not exclude_user or u.pk != exclude_user.pk:
+                found[u.pk] = u
+    for uname in names:
+        u = User.objects.filter(username__iexact=uname, is_active=True).first()
+        if u and (not exclude_user or u.pk != exclude_user.pk):
+            found[u.pk] = u
+    return list(found.values())
+
+
+
 CHAT_GAP_SECONDS = 15 * 60  # 15-minute gap triggers a Messenger-style time separator
 
 
@@ -384,18 +464,13 @@ def _chat_partner_flags(user, other):
 
 @login_required
 def chat_inbox(request):
-    inbox, requests = _build_conversation_lists(request.user)
-    tab = "requests" if request.GET.get("tab") == "requests" else "inbox"
+    tab = request.GET.get("tab") or "inbox"
     return render(
         request,
         "accounts/chat.html",
         {
-            "inbox": inbox,
-            "requests": requests,
-            "tab": tab,
-            "active_partner": None,
+            **_chat_sidebar_context(request.user, tab=tab),
             "conversation": None,
-            "friends_without_chat": request.user.friends().order_by("username"),
         },
     )
 
@@ -403,7 +478,6 @@ def chat_inbox(request):
 @login_required
 def chat_dock(request, username=None):
     """Render the Messenger/Reddit-style floating quick-chat popup (inbox list or active thread)."""
-    inbox, requests_list = _build_conversation_lists(request.user)
     if username:
         other = _target(username)
         if other.pk == request.user.pk:
@@ -419,27 +493,19 @@ def chat_dock(request, username=None):
             request,
             "accounts/_chat_dock.html",
             {
-                "inbox": inbox,
-                "requests": requests_list,
-                "tab": tab,
-                "active_partner": other,
+                **_chat_sidebar_context(request.user, tab=tab, active_partner=other),
                 **flags,
                 "chat_messages": chat_messages,
-                "friends_without_chat": request.user.friends().order_by("username"),
             },
         )
 
-    tab = "requests" if request.GET.get("tab") == "requests" else "inbox"
+    tab = request.GET.get("tab") or "inbox"
     return render(
         request,
         "accounts/_chat_dock.html",
         {
-            "inbox": inbox,
-            "requests": requests_list,
-            "tab": tab,
-            "active_partner": None,
+            **_chat_sidebar_context(request.user, tab=tab),
             "conversation": None,
-            "friends_without_chat": request.user.friends().order_by("username"),
         },
     )
 
@@ -518,21 +584,16 @@ def chat_thread(request, username):
         conv.messages.filter(is_read=False).exclude(sender=request.user).update(is_read=True)
         chat_messages = _annotate_chat_separators(list(conv.messages.select_related("sender").all()), conv=None)
 
-    inbox, requests = _build_conversation_lists(request.user)
     tab = "requests" if flags["is_incoming_request"] else "inbox"
 
     return render(
         request,
         "accounts/chat.html",
         {
-            "inbox": inbox,
-            "requests": requests,
-            "tab": tab,
-            "active_partner": other,
+            **_chat_sidebar_context(request.user, tab=tab, active_partner=other),
             **flags,
             "chat_messages": chat_messages,
             "form": form,
-            "friends_without_chat": request.user.friends().order_by("username"),
         },
     )
 
@@ -648,6 +709,339 @@ def chat_message_delete(request, pk):
 
 
 # ---------------------------------------------------------------------------
+# Group Chats
+# ---------------------------------------------------------------------------
+
+
+def _group_typing_key(group_id, sender_id):
+    return f"group_typing:{group_id}:{sender_id}"
+
+
+def _set_group_typing(group_id, sender_id, is_typing):
+    key = _group_typing_key(group_id, sender_id)
+    now_ts = timezone.now().timestamp()
+    if is_typing:
+        _TYPING_MEM[key] = now_ts + TYPING_TTL_SECONDS
+    else:
+        _TYPING_MEM.pop(key, None)
+    try:
+        if is_typing:
+            cache.set(key, True, timeout=int(TYPING_TTL_SECONDS))
+        else:
+            cache.delete(key)
+    except Exception:
+        pass
+
+
+def _is_group_member_typing(group_id, sender_id):
+    key = _group_typing_key(group_id, sender_id)
+    exp = _TYPING_MEM.get(key)
+    if exp is not None:
+        if exp > timezone.now().timestamp():
+            return True
+        _TYPING_MEM.pop(key, None)
+    try:
+        return bool(cache.get(key))
+    except Exception:
+        return False
+
+
+def _format_group_typing_text(names):
+    if not names:
+        return ""
+    if len(names) == 1:
+        return f"<strong>{names[0]}</strong> is typing…"
+    if len(names) == 2:
+        return f"<strong>{names[0]}</strong> and <strong>{names[1]}</strong> are typing…"
+    return f"<strong>{names[0]}</strong> and {len(names) - 1} others are typing…"
+
+
+@login_required
+@require_POST
+@ratelimit("chat_group_create", 20, 3600)
+def chat_group_create(request):
+    """Create a new group chat and invite selected friends / usernames."""
+    name = (request.POST.get("name") or "").strip()[:80]
+    if not name:
+        err = "Please enter a group name."
+        if _is_live(request):
+            return JsonResponse({"ok": False, "toast": err}, status=400)
+        messages.error(request, err)
+        return redirect("accounts:chat_inbox")
+
+    invited = _resolve_invited_users(request, exclude_user=request.user)
+    now = timezone.now()
+    with transaction.atomic():
+        group = ChatGroup.objects.create(
+            name=name,
+            created_by=request.user,
+            updated_at=now,
+        )
+        ChatGroupMember.objects.create(group=group, user=request.user, last_read_at=now)
+        for u in invited:
+            ChatGroupMember.objects.get_or_create(
+                group=group,
+                user=u,
+                defaults={"last_read_at": now},
+            )
+
+    toast = f'Group "{group.name}" created.'
+    if _is_live(request):
+        return JsonResponse(
+            {
+                "ok": True,
+                "group_id": group.pk,
+                "redirect": reverse("accounts:chat_group", args=[group.pk]),
+                "dock_url": reverse("accounts:chat_dock_group", args=[group.pk]),
+                "toast": toast,
+            }
+        )
+    messages.success(request, toast)
+    return redirect("accounts:chat_group", pk=group.pk)
+
+
+def _group_detail_context(request, group, membership):
+    chat_messages = _annotate_chat_separators(list(group.messages.select_related("sender").all()), conv=None)
+    group_members = list(
+        User.objects.filter(chat_group_memberships__group=group, is_active=True).order_by(
+            "chat_group_memberships__joined_at"
+        )
+    )
+    member_ids = {u.pk for u in group_members}
+    addable_friends = [f for f in request.user.friends().order_by("username") if f.pk not in member_ids]
+    tab = request.GET.get("tab") or "inbox"
+    return {
+        **_chat_sidebar_context(request.user, tab=tab, active_group=group),
+        "is_group_chat": True,
+        "can_send": True,
+        "is_friends": True,
+        "chat_messages": chat_messages,
+        "group_members": group_members,
+        "addable_friends": addable_friends,
+    }
+
+
+@login_required
+@ratelimit("chat", 60, 60)
+def chat_group(request, pk):
+    group = get_object_or_404(ChatGroup, pk=pk)
+    membership = ChatGroupMember.objects.filter(group=group, user=request.user).first()
+    if not membership:
+        err = "You are not a member of this group."
+        if _is_live(request):
+            return JsonResponse({"ok": False, "toast": err}, status=403)
+        messages.error(request, err)
+        return redirect("accounts:chat_inbox")
+
+    form = DirectMessageForm(request.POST or None, request.FILES or None)
+    if request.method == "POST":
+        if form.is_valid():
+            now = timezone.now()
+            with transaction.atomic():
+                msg = GroupMessage.objects.create(
+                    group=group,
+                    sender=request.user,
+                    body=form.cleaned_data["body"],
+                    attachment=form.cleaned_data.get("attachment"),
+                    created_at=now,
+                )
+                group.updated_at = now
+                group.save(update_fields=["updated_at"])
+                membership.last_read_at = now
+                membership.save(update_fields=["last_read_at"])
+
+            _set_group_typing(group.pk, request.user.pk, False)
+            if _is_live(request):
+                _annotate_chat_separators([msg], conv=group)
+                msg_html = render_to_string(
+                    "accounts/_chat_bubbles.html",
+                    {"chat_messages": [msg], "user": request.user, "is_group_chat": True, "active_group": group},
+                    request=request,
+                )
+                return JsonResponse({"ok": True, "message_html": msg_html, "msg_id": msg.pk})
+            return redirect("accounts:chat_group", pk=group.pk)
+        elif _is_live(request):
+            first_err = next((errs[0] for errs in form.errors.values() if errs), "Invalid message.")
+            return JsonResponse({"ok": False, "toast": str(first_err)}, status=400)
+
+    membership.last_read_at = timezone.now()
+    membership.save(update_fields=["last_read_at"])
+    ctx = _group_detail_context(request, group, membership)
+    ctx["form"] = form
+    return render(request, "accounts/chat.html", ctx)
+
+
+@login_required
+def chat_dock_group(request, pk):
+    """Render a group chat inside the floating Quick-Chat Dock."""
+    group = get_object_or_404(ChatGroup, pk=pk)
+    membership = ChatGroupMember.objects.filter(group=group, user=request.user).first()
+    if not membership:
+        return redirect("accounts:chat_dock")
+
+    membership.last_read_at = timezone.now()
+    membership.save(update_fields=["last_read_at"])
+    ctx = _group_detail_context(request, group, membership)
+    return render(request, "accounts/_chat_dock.html", ctx)
+
+
+@login_required
+@require_POST
+def chat_group_add_member(request, pk):
+    group = get_object_or_404(ChatGroup, pk=pk)
+    if not group.is_member(request.user):
+        if _is_live(request):
+            return JsonResponse({"ok": False, "toast": "You are not a member of this group."}, status=403)
+        return redirect("accounts:chat_inbox")
+
+    invited = _resolve_invited_users(request, exclude_user=request.user)
+    if not invited:
+        err = "Could not find an active student with that username."
+        if _is_live(request):
+            return JsonResponse({"ok": False, "toast": err}, status=400)
+        messages.error(request, err)
+        return redirect("accounts:chat_group", pk=group.pk)
+
+    now = timezone.now()
+    added_names = []
+    for u in invited:
+        _, created = ChatGroupMember.objects.get_or_create(
+            group=group,
+            user=u,
+            defaults={"last_read_at": now},
+        )
+        if created:
+            added_names.append(u.name)
+
+    if added_names:
+        group.updated_at = now
+        group.save(update_fields=["updated_at"])
+        toast = f"Added {', '.join(added_names)} to {group.name}."
+    else:
+        toast = "Already in the group."
+
+    if _is_live(request):
+        return JsonResponse({"ok": True, "toast": toast})
+    messages.success(request, toast)
+    return redirect("accounts:chat_group", pk=group.pk)
+
+
+@login_required
+@require_POST
+def chat_group_leave(request, pk):
+    group = get_object_or_404(ChatGroup, pk=pk)
+    membership = ChatGroupMember.objects.filter(group=group, user=request.user).first()
+    if membership:
+        group_name = group.name
+        membership.delete()
+        remaining = group.memberships.select_related("user").first()
+        if not remaining:
+            group.delete()
+        elif group.created_by_id == request.user.pk:
+            group.created_by = remaining.user
+            group.save(update_fields=["created_by"])
+        toast = f'You left "{group_name}".'
+        if not _is_live(request):
+            messages.info(request, toast)
+    else:
+        toast = ""
+
+    if _is_live(request):
+        return JsonResponse({"ok": True, "redirect": reverse("accounts:chat_inbox"), "toast": toast})
+    return redirect("accounts:chat_inbox")
+
+
+@login_required
+@require_POST
+def chat_group_message_edit(request, pk):
+    """Edit own group message within the 15-minute window after sending."""
+    msg = get_object_or_404(
+        GroupMessage.objects.select_related("group", "sender"),
+        pk=pk,
+        sender=request.user,
+    )
+    if not msg.group.is_member(request.user):
+        if _is_live(request):
+            return JsonResponse({"ok": False, "toast": "Not a member of this group."}, status=403)
+        return redirect("accounts:chat_inbox")
+
+    if not msg.can_edit:
+        err = "Messages can only be edited within 15 minutes of sending."
+        if _is_live(request):
+            return JsonResponse({"ok": False, "toast": err}, status=400)
+        messages.error(request, err)
+        return redirect("accounts:chat_group", pk=msg.group_id)
+
+    new_body = (request.POST.get("body") or "").strip()[:4000]
+    if not new_body and not msg.attachment:
+        err = "Message cannot be empty."
+        if _is_live(request):
+            return JsonResponse({"ok": False, "toast": err}, status=400)
+        messages.error(request, err)
+        return redirect("accounts:chat_group", pk=msg.group_id)
+
+    msg.body = new_body
+    msg.edited_at = timezone.now()
+    msg.save(update_fields=["body", "edited_at"])
+    msg.show_time_sep = False
+
+    if _is_live(request):
+        bubble_html = render_to_string(
+            "accounts/_chat_bubbles.html",
+            {"chat_messages": [msg], "user": request.user, "is_group_chat": True, "active_group": msg.group},
+            request=request,
+        )
+        return JsonResponse({"ok": True, "msg_id": msg.pk, "bubble_html": bubble_html})
+    return redirect("accounts:chat_group", pk=msg.group_id)
+
+
+@login_required
+@require_POST
+def chat_group_message_delete(request, pk):
+    """Delete own group message (or any message in a group created by the user)."""
+    msg = get_object_or_404(
+        GroupMessage.objects.select_related("group", "sender"),
+        pk=pk,
+    )
+    if not msg.group.is_member(request.user) or (
+        msg.sender_id != request.user.pk and msg.group.created_by_id != request.user.pk
+    ):
+        if _is_live(request):
+            return JsonResponse({"ok": False, "toast": "Permission denied."}, status=403)
+        return redirect("accounts:chat_group", pk=msg.group_id)
+
+    if not msg.is_deleted:
+        if msg.attachment:
+            msg.attachment.delete(save=False)
+        msg.is_deleted = True
+        msg.body = ""
+        msg.attachment = None
+        msg.edited_at = timezone.now()
+        msg.save(update_fields=["is_deleted", "body", "attachment", "edited_at"])
+    msg.show_time_sep = False
+
+    if _is_live(request):
+        bubble_html = render_to_string(
+            "accounts/_chat_bubbles.html",
+            {"chat_messages": [msg], "user": request.user, "is_group_chat": True, "active_group": msg.group},
+            request=request,
+        )
+        return JsonResponse({"ok": True, "msg_id": msg.pk, "bubble_html": bubble_html})
+    return redirect("accounts:chat_group", pk=msg.group_id)
+
+
+@login_required
+@require_POST
+def chat_group_typing(request, pk):
+    """Broadcast whether the current user is typing in group ``pk``."""
+    group = get_object_or_404(ChatGroup, pk=pk)
+    if group.is_member(request.user):
+        is_typing = request.POST.get("typing") == "1"
+        _set_group_typing(group.pk, request.user.pk, is_typing)
+    return JsonResponse({"ok": True})
+
+
+# ---------------------------------------------------------------------------
 # Live Typing Indicator & Real-Time Sync Endpoint
 # ---------------------------------------------------------------------------
 
@@ -706,12 +1100,93 @@ def live_poll(request):
     user = request.user
 
     if user.is_authenticated:
-        # 1. Active chat thread & sidebar
+        # 1. Active chat thread (1-on-1 DM or Group Chat) & sidebar
         chat_partner_name = request.GET.get("chat_partner", "").strip()
+        chat_group_raw = request.GET.get("chat_group", "").strip()
         chat_shell = request.GET.get("chat_shell") == "1"
         active_partner = None
+        active_group = None
 
-        if chat_partner_name:
+        if chat_group_raw.isdigit():
+            active_group = ChatGroup.objects.filter(pk=int(chat_group_raw)).first()
+            membership = (
+                ChatGroupMember.objects.filter(group=active_group, user=user).first()
+                if active_group
+                else None
+            )
+            if active_group and membership:
+                if request.GET.get("typing") == "1":
+                    _set_group_typing(active_group.pk, user.pk, True)
+                membership.last_read_at = timezone.now()
+                membership.save(update_fields=["last_read_at"])
+                try:
+                    last_msg_id = int(request.GET.get("last_msg_id") or 0)
+                except ValueError:
+                    last_msg_id = 0
+
+                new_msgs = _annotate_chat_separators(
+                    list(active_group.messages.filter(pk__gt=last_msg_id).select_related("sender")),
+                    conv=active_group,
+                )
+                msg_agg = active_group.messages.aggregate(
+                    max_edit=Max("edited_at"),
+                    del_cnt=Count("id", filter=Q(is_deleted=True)),
+                )
+                msg_sig = (
+                    f"{msg_agg['del_cnt'] or 0}:"
+                    f"{int(msg_agg['max_edit'].timestamp()) if msg_agg['max_edit'] else 0}"
+                )
+                updated_bubbles = {}
+                client_msg_sig = request.GET.get("chat_msg_sig", "")
+                if client_msg_sig and client_msg_sig != msg_sig and last_msg_id > 0:
+                    modified_msgs = list(
+                        active_group.messages.filter(pk__lte=last_msg_id)
+                        .filter(Q(edited_at__isnull=False) | Q(is_deleted=True))
+                        .select_related("sender")
+                    )
+                    for m in modified_msgs:
+                        m.show_time_sep = False
+                        updated_bubbles[str(m.pk)] = render_to_string(
+                            "accounts/_chat_bubbles.html",
+                            {"chat_messages": [m], "user": user, "is_group_chat": True, "active_group": active_group},
+                            request=request,
+                        )
+
+                group_members = list(
+                    User.objects.filter(chat_group_memberships__group=active_group, is_active=True).order_by(
+                        "chat_group_memberships__joined_at"
+                    )
+                )
+                typing_names = [
+                    u.name
+                    for u in group_members
+                    if u.pk != user.pk and _is_group_member_typing(active_group.pk, u.pk)
+                ]
+                data["chat"] = {
+                    "is_group": True,
+                    "group_id": active_group.pk,
+                    "member_count": len(group_members),
+                    "members_names": ", ".join(u.name for u in group_members),
+                    "msg_sig": msg_sig,
+                    "updated_bubbles": updated_bubbles,
+                    "is_friends": True,
+                    "partner_typing": bool(typing_names),
+                    "typing_html": _format_group_typing_text(typing_names),
+                    "new_messages_html": (
+                        render_to_string(
+                            "accounts/_chat_bubbles.html",
+                            {"chat_messages": new_msgs, "user": user, "is_group_chat": True, "active_group": active_group},
+                            request=request,
+                        )
+                        if new_msgs
+                        else ""
+                    ),
+                }
+            else:
+                data["chat_group_removed"] = True
+                active_group = None
+
+        elif chat_partner_name:
             active_partner = User.objects.filter(username__iexact=chat_partner_name, is_active=True).first()
             if active_partner and active_partner.pk != user.pk:
                 flags = _chat_partner_flags(user, active_partner)
@@ -778,16 +1253,11 @@ def live_poll(request):
                 }
 
         if chat_shell:
-            inbox, requests_list = _build_conversation_lists(user)
-            tab = "requests" if request.GET.get("chat_tab") == "requests" else "inbox"
+            tab = request.GET.get("chat_tab") or "inbox"
             data["chat_sidebar_html"] = render_to_string(
                 "accounts/_chat_sidebar.html",
                 {
-                    "inbox": inbox,
-                    "requests": requests_list,
-                    "tab": tab,
-                    "active_partner": active_partner,
-                    "friends_without_chat": user.friends().order_by("username"),
+                    **_chat_sidebar_context(user, tab=tab, active_partner=active_partner, active_group=active_group),
                     "user": user,
                 },
                 request=request,
@@ -797,15 +1267,7 @@ def live_poll(request):
         data["pending_friends"] = FriendRequest.objects.filter(
             to_user=user, status=FriendRequest.Status.PENDING
         ).count()
-        data["unread_messages"] = (
-            DirectMessage.objects.filter(
-                Q(conversation__user1=user) | Q(conversation__user2=user),
-                is_read=False,
-            )
-            .exclude(sender=user)
-            .exclude(conversation__status=Conversation.Status.IGNORED)
-            .count()
-        )
+        data["unread_messages"] = count_unread_messages(user)
 
         # 3. Friends page live region
         if request.GET.get("friends_page") == "1":

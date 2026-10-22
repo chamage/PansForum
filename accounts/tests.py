@@ -7,7 +7,7 @@ from django.urls import reverse
 from django.utils import timezone
 from PIL import Image
 
-from .models import Conversation, DirectMessage, FriendRequest, User, relationship
+from .models import ChatGroup, ChatGroupMember, Conversation, DirectMessage, FriendRequest, GroupMessage, User, relationship
 
 
 def make_image_bytes(fmt="PNG", size=(300, 300), color=(45, 106, 79)):
@@ -359,6 +359,102 @@ class AccountsTests(TestCase):
         dock_thread = self.client.get(reverse("accounts:chat_dock_thread", args=[self.bob.username]))
         self.assertEqual(dock_thread.status_code, 200)
         self.assertContains(dock_thread, "This message was deleted.")
+
+    def test_group_chat_lifecycle_and_live_poll(self):
+        charlie = User.objects.create_user(
+            username="charlie", email="charlie@student.pans.edu", password=self.password
+        )
+        # 1. Alice creates a group inviting Bob via checkbox ID
+        self.client.force_login(self.alice)
+        create_resp = self.client.post(
+            reverse("accounts:chat_group_create"),
+            {"name": "CS Study Group", "members": [str(self.bob.pk)]},
+            HTTP_X_LIVE_ACTION="1",
+        )
+        self.assertEqual(create_resp.status_code, 200)
+        c_data = create_resp.json()
+        self.assertTrue(c_data["ok"])
+        group = ChatGroup.objects.get(pk=c_data["group_id"])
+        self.assertEqual(group.name, "CS Study Group")
+        self.assertEqual(group.memberships.count(), 2)
+
+        # 2. Alice sends a message in the group
+        send_resp = self.client.post(
+            reverse("accounts:chat_group", args=[group.pk]),
+            {"body": "Hey everyone, exam notes here!"},
+            HTTP_X_LIVE_ACTION="1",
+        )
+        self.assertEqual(send_resp.status_code, 200)
+        self.assertTrue(send_resp.json()["ok"])
+        msg = GroupMessage.objects.get(pk=send_resp.json()["msg_id"])
+
+        # 3. Bob sees 1 unread message in /live/poll/
+        self.client.force_login(self.bob)
+        bob_poll = self.client.get(reverse("accounts:live_poll"))
+        self.assertEqual(bob_poll.json()["unread_messages"], 1)
+
+        # 4. Bob opens the group in Quick-Chat Dock and polls -> message rendered & unread cleared
+        dock_grp = self.client.get(reverse("accounts:chat_dock_group", args=[group.pk]))
+        self.assertEqual(dock_grp.status_code, 200)
+        self.assertContains(dock_grp, "CS Study Group")
+        self.assertContains(dock_grp, "Hey everyone, exam notes here!")
+
+        bob_group_poll = self.client.get(
+            reverse("accounts:live_poll"),
+            {"chat_shell": "1", "chat_group": str(group.pk), "last_msg_id": "0"},
+        )
+        g_payload = bob_group_poll.json()
+        self.assertEqual(g_payload["unread_messages"], 0)
+        self.assertTrue(g_payload["chat"]["is_group"])
+        self.assertIn("Hey everyone, exam notes here!", g_payload["chat"]["new_messages_html"])
+
+        # 5. Bob adds Charlie to the group
+        add_resp = self.client.post(
+            reverse("accounts:chat_group_add_member", args=[group.pk]),
+            {"username": "@charlie"},
+            HTTP_X_LIVE_ACTION="1",
+        )
+        self.assertEqual(add_resp.status_code, 200)
+        self.assertEqual(group.memberships.count(), 3)
+
+        # 6. Charlie types in the group -> Alice sees Charlie typing via live_poll
+        self.client.force_login(charlie)
+        self.client.post(reverse("accounts:chat_group_typing", args=[group.pk]), {"typing": "1"})
+        self.client.force_login(self.alice)
+        alice_g_poll = self.client.get(
+            reverse("accounts:live_poll"),
+            {"chat_group": str(group.pk), "last_msg_id": str(msg.pk)},
+        ).json()
+        self.assertTrue(alice_g_poll["chat"]["partner_typing"])
+        self.assertIn("charlie", alice_g_poll["chat"]["typing_html"])
+
+        # 7. Alice edits and then deletes her group message
+        edit_g = self.client.post(
+            reverse("accounts:chat_group_message_edit", args=[msg.pk]),
+            {"body": "Updated exam notes!"},
+            HTTP_X_LIVE_ACTION="1",
+        )
+        self.assertEqual(edit_g.status_code, 200)
+        msg.refresh_from_db()
+        self.assertEqual(msg.body, "Updated exam notes!")
+
+        del_g = self.client.post(
+            reverse("accounts:chat_group_message_delete", args=[msg.pk]),
+            HTTP_X_LIVE_ACTION="1",
+        )
+        self.assertEqual(del_g.status_code, 200)
+        msg.refresh_from_db()
+        self.assertTrue(msg.is_deleted)
+
+        # 8. Charlie leaves the group
+        self.client.force_login(charlie)
+        leave_resp = self.client.post(
+            reverse("accounts:chat_group_leave", args=[group.pk]),
+            HTTP_X_LIVE_ACTION="1",
+        )
+        self.assertEqual(leave_resp.status_code, 200)
+        self.assertEqual(group.memberships.count(), 2)
+
 
 
 

@@ -1,4 +1,11 @@
 {% load forum_extras %}{% for msg in chat_messages %}{% if msg.show_time_sep %}<div class="chat-sep" role="separator" data-sep-for="{{ msg.pk }}"><span>{{ msg.created_at|date:"D, M j · H:i" }}</span></div>{% endif %}<div class="chat-bubble{% if msg.sender_id == user.pk %} chat-bubble--mine{% else %} chat-bubble--theirs{% endif %}{% if msg.is_deleted %} chat-bubble--deleted{% endif %}" data-msg-id="{{ msg.pk }}" data-msg-ts="{{ msg.created_at|date:'U' }}">
+  {% if is_group_chat and msg.sender_id != user.pk %}
+    <a href="{{ msg.sender.get_absolute_url }}" class="chat-bubble__sender">
+      {% avatar msg.sender "xs" %}
+      <strong>{{ msg.sender.name }}</strong>
+      <span class="muted">@{{ msg.sender.username }}</span>
+    </a>
+  {% endif %}
   {% if msg.is_deleted %}
     <div class="chat-bubble__text chat-bubble__deleted"><em>This message was deleted.</em></div>
   {% else %}
@@ -13,7 +20,7 @@
       <div class="chat-bubble__text prose" data-msg-content>{{ msg.body|render_body }}</div>
     {% endif %}
     {% if msg.sender_id == user.pk and msg.can_edit %}
-      <form method="post" action="{% url 'accounts:chat_message_edit' msg.pk %}" class="chat-edit-form" data-chat-edit-form hidden>
+      <form method="post" action="{% if is_group_chat %}{% url 'accounts:chat_group_message_edit' msg.pk %}{% else %}{% url 'accounts:chat_message_edit' msg.pk %}{% endif %}" class="chat-edit-form" data-chat-edit-form hidden>
         {% csrf_token %}
         <label class="sr-only" for="edit-msg-{{ msg.pk }}">Edit message</label>
         <textarea name="body" id="edit-msg-{{ msg.pk }}" rows="2" maxlength="4000" required>{{ msg.body }}</textarea>
@@ -26,15 +33,17 @@
   {% endif %}
   <div class="chat-bubble__meta">
     <time class="chat-bubble__time" datetime="{{ msg.created_at|date:'c' }}" title="{{ msg.created_at }}">{{ msg.created_at|date:"H:i" }}{% if msg.edited_at and not msg.is_deleted %} · edited{% endif %}</time>
-    {% if msg.sender_id == user.pk and not msg.is_deleted %}
-      <span class="chat-bubble__actions">
-        {% if msg.can_edit %}
-          <button type="button" class="chat-bubble__act" data-chat-edit-open title="Editable for 15 minutes after sending">Edit</button>
-        {% endif %}
-        <form method="post" action="{% url 'accounts:chat_message_delete' msg.pk %}" class="inline" data-chat-delete-form data-confirm="Delete this message?">
-          {% csrf_token %}<button type="submit" class="chat-bubble__act chat-bubble__act--danger" title="Delete message">Delete</button>
-        </form>
-      </span>
+    {% if not msg.is_deleted %}
+      {% if msg.sender_id == user.pk or is_group_chat and active_group and active_group.created_by_id == user.pk %}
+        <span class="chat-bubble__actions">
+          {% if msg.sender_id == user.pk and msg.can_edit %}
+            <button type="button" class="chat-bubble__act" data-chat-edit-open title="Editable for 15 minutes after sending">Edit</button>
+          {% endif %}
+          <form method="post" action="{% if is_group_chat %}{% url 'accounts:chat_group_message_delete' msg.pk %}{% else %}{% url 'accounts:chat_message_delete' msg.pk %}{% endif %}" class="inline" data-chat-delete-form data-confirm="Delete this message?">
+            {% csrf_token %}<button type="submit" class="chat-bubble__act chat-bubble__act--danger" title="Delete message">Delete</button>
+          </form>
+        </span>
+      {% endif %}
     {% endif %}
   </div>
 </div>{% endfor %}

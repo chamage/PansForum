@@ -1,17 +1,91 @@
 {% extends "base.html" %}
 {% load forum_extras %}
-{% block title %}{% if active_partner %}Chat with {{ active_partner.name }} · {% endif %}Messages · {{ SITE_NAME }}{% endblock %}
+{% block title %}{% if active_group %}{{ active_group.name }} · {% elif active_partner %}Chat with {{ active_partner.name }} · {% endif %}Messages · {{ SITE_NAME }}{% endblock %}
 {% block chat_dock %}{% endblock %}
 {% block content %}
-<div class="chat-shell card{% if active_partner %} has-active-partner{% endif %}" data-chat-shell data-chat-tab="{{ tab }}" data-chat-partner="{% if active_partner %}{{ active_partner.username }}{% endif %}" data-active-partner="{% if active_partner %}{{ active_partner.username }}{% endif %}">
-  <!-- Left sidebar: Inbox & Message Requests -->
+<div class="chat-shell card{% if active_partner or active_group %} has-active-partner{% endif %}" data-chat-shell data-chat-tab="{{ tab }}" data-chat-partner="{% if active_partner %}{{ active_partner.username }}{% endif %}" data-active-partner="{% if active_partner %}{{ active_partner.username }}{% endif %}" data-chat-group="{% if active_group %}{{ active_group.pk }}{% endif %}">
+  <!-- Left sidebar: Inbox, Groups & Message Requests -->
   <aside class="chat-side" id="chat-sidebar">
     {% include "accounts/_chat_sidebar.html" %}
   </aside>
 
-  <!-- Right pane: Active conversation -->
+  <!-- Right pane: Active conversation or Group chat -->
   <section class="chat-main">
-    {% if active_partner %}
+    {% if active_group %}
+      <header class="chat-main__head">
+        <div class="chat-main__head-left">
+          <a class="btn btn--ghost btn--sm chat-main__back" href="{% url 'accounts:chat_inbox' %}" aria-label="Back to conversations">←</a>
+          <div class="chat-main__partner">
+            <span class="avatar avatar--md avatar--group" aria-hidden="true">{{ active_group.initial }}</span>
+            <div>
+              <strong>{{ active_group.name }}</strong>
+              <span class="muted small">
+                <span data-group-member-count>{{ group_members|length }} member{{ group_members|length|pluralize }}</span>
+                · <span data-group-members-names>{% for m in group_members %}{{ m.name }}{% if not forloop.last %}, {% endif %}{% endfor %}</span>
+              </span>
+            </div>
+          </div>
+        </div>
+        <div class="chat-main__head-actions">
+          <details class="chat-group-popover">
+            <summary class="btn btn--ghost btn--sm">👥 Members &amp; invite</summary>
+            <div class="chat-group-popover__panel card">
+              <form method="post" action="{% url 'accounts:chat_group_add_member' active_group.pk %}" class="chat-group-invite-form" data-chat-action>
+                {% csrf_token %}
+                <label class="small" for="id_group_add_user"><strong>Add student to group</strong></label>
+                <div class="chat-group-invite-row">
+                  <input type="text" name="username" id="id_group_add_user" placeholder="@username">
+                  <button type="submit" class="btn btn--primary btn--sm">Add</button>
+                </div>
+                {% if addable_friends %}
+                  <div class="chat-new-group__chips">
+                    {% for f in addable_friends %}
+                      <label class="chip chip--check">
+                        <input type="checkbox" name="members" value="{{ f.pk }}">
+                        {% avatar f "xs" %} <span>{{ f.name }}</span>
+                      </label>
+                    {% endfor %}
+                  </div>
+                {% endif %}
+              </form>
+              <hr class="sep">
+              <div class="chat-group-members-list">
+                <span class="muted small">In this group ({{ group_members|length }}):</span>
+                <div class="chat-friends-chips">
+                  {% for m in group_members %}
+                    <a class="chip" href="{{ m.get_absolute_url }}">{% avatar m "xs" %} {{ m.name }}</a>
+                  {% endfor %}
+                </div>
+              </div>
+              <hr class="sep">
+              <form method="post" action="{% url 'accounts:chat_group_leave' active_group.pk %}" data-chat-action data-confirm="Leave group &quot;{{ active_group.name }}&quot;?">
+                {% csrf_token %}
+                <button type="submit" class="btn btn--danger btn--sm btn--block">Leave group</button>
+              </form>
+            </div>
+          </details>
+        </div>
+      </header>
+
+      <div class="chat-log" id="chat-log">
+        {% if chat_messages %}
+          {% include "accounts/_chat_bubbles.html" %}
+        {% else %}
+          <div class="chat-empty muted" data-chat-empty>
+            <p>Welcome to <strong>{{ active_group.name }}</strong> 👋 Send the first message below!</p>
+          </div>
+        {% endif %}
+      </div>
+
+      <div class="chat-typing muted small" id="chat-typing-indicator" aria-live="polite" hidden>
+        <span class="chat-typing__dots" aria-hidden="true"><span></span><span></span><span></span></span>
+        <span data-chat-typing-text>Someone is typing…</span>
+      </div>
+
+      <footer class="chat-main__foot" id="chat-foot-slot">
+        {% include "accounts/_chat_foot.html" %}
+      </footer>
+    {% elif active_partner %}
       <header class="chat-main__head">
         <div class="chat-main__head-left">
           <a class="btn btn--ghost btn--sm chat-main__back" href="{% url 'accounts:chat_inbox' %}" aria-label="Back to conversations">←</a>
@@ -44,7 +118,7 @@
 
       <div class="chat-typing muted small" id="chat-typing-indicator" aria-live="polite" hidden>
         <span class="chat-typing__dots" aria-hidden="true"><span></span><span></span><span></span></span>
-        <span><strong>{{ active_partner.name }}</strong> is typing…</span>
+        <span data-chat-typing-text><strong>{{ active_partner.name }}</strong> is typing…</span>
       </div>
 
       <footer class="chat-main__foot" id="chat-foot-slot">
@@ -53,8 +127,8 @@
     {% else %}
       <div class="chat-placeholder empty">
         <p class="empty__emoji" aria-hidden="true">💬</p>
-        <h2>Your messages</h2>
-        <p class="muted">Friends can DM each other freely. Non-friends can send a message request that you can choose to respond to or ignore.</p>
+        <h2>Your messages &amp; groups</h2>
+        <p class="muted">Message friends directly, start a group chat with classmates using <strong>＋ New group chat</strong> on the left, or respond to message requests.</p>
       </div>
     {% endif %}
   </section>

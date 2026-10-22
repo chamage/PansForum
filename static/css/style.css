@@ -2517,6 +2517,164 @@ body.has-crop-modal-open {
   border-top: 1px solid var(--border);
 }
 
+/* ==========================================================================
+   Group Chats (Sidebar Creator, Group Avatars, Member Management & Bubbles)
+   ========================================================================== */
+
+.avatar--group {
+  background: var(--accent-soft);
+  color: var(--accent);
+  border: 1px solid var(--accent);
+  font-weight: 700;
+}
+
+.badge--subtle {
+  background: var(--surface-subtle);
+  color: var(--text-muted);
+  border: 1px solid var(--border);
+}
+
+.chat-side__title-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+}
+
+.chat-new-group {
+  margin-top: 0.6rem;
+}
+
+.chat-new-group__toggle {
+  width: 100%;
+  justify-content: center;
+  list-style: none;
+  border: 1px dashed var(--border-strong);
+}
+
+.chat-new-group__toggle::-webkit-details-marker {
+  display: none;
+}
+
+.chat-new-group[open] .chat-new-group__toggle {
+  border-style: solid;
+  background: var(--surface-subtle);
+  margin-bottom: 0.55rem;
+}
+
+.chat-new-group__form {
+  display: flex;
+  flex-direction: column;
+  gap: 0.55rem;
+  padding: 0.7rem;
+  border-radius: var(--radius-sm);
+  background: var(--surface-subtle);
+  border: 1px solid var(--border);
+}
+
+.chat-new-group__form .field {
+  margin: 0;
+}
+
+.chat-new-group__friends {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+}
+
+.chat-new-group__chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.35rem;
+  max-height: 110px;
+  overflow-y: auto;
+}
+
+.chip--check {
+  cursor: pointer;
+  user-select: none;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+}
+
+.chip--check input[type="checkbox"] {
+  width: 0.85rem;
+  height: 0.85rem;
+  margin: 0;
+  accent-color: var(--accent);
+}
+
+.chat-main__head-actions {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  position: relative;
+}
+
+.chat-group-popover {
+  position: relative;
+}
+
+.chat-group-popover > summary {
+  list-style: none;
+}
+
+.chat-group-popover > summary::-webkit-details-marker {
+  display: none;
+}
+
+.chat-group-popover__panel {
+  position: absolute;
+  top: calc(100% + 0.45rem);
+  right: 0;
+  z-index: 40;
+  width: min(310px, calc(100vw - 2rem));
+  padding: 0.85rem;
+  box-shadow: var(--shadow-md);
+  display: flex;
+  flex-direction: column;
+  gap: 0.65rem;
+}
+
+.chat-group-invite-form {
+  display: flex;
+  flex-direction: column;
+  gap: 0.45rem;
+}
+
+.chat-group-invite-row {
+  display: flex;
+  gap: 0.4rem;
+}
+
+.chat-group-invite-row input[type="text"] {
+  flex: 1;
+  min-width: 0;
+}
+
+.chat-group-members-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+}
+
+.chat-bubble__sender {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  font-size: 0.76rem;
+  margin-bottom: 0.25rem;
+  color: var(--text);
+  text-decoration: none;
+}
+
+.chat-bubble__sender:hover strong {
+  color: var(--accent);
+  text-decoration: underline;
+}
+
+
 
 
 

@@ -416,8 +416,8 @@
       }
     }
 
-    // 8. Close open account <details> menu when clicking outside
-    document.querySelectorAll("details.menu[open]").forEach((menu) => {
+    // 8. Close open account <details> menu or group popover when clicking outside
+    document.querySelectorAll("details.menu[open], details.chat-group-popover[open]").forEach((menu) => {
       if (!menu.contains(e.target)) menu.removeAttribute("open");
     });
   });
@@ -433,12 +433,15 @@
   let lastTypingPingSentAt = 0;
   let typingIdleTimer = null;
 
-  function sendTypingPing(partner, isTyping) {
-    if (!partner || !isAuth) return;
+  function sendTypingPing(partner, groupId, isTyping) {
+    if (!isAuth || (!partner && !groupId)) return;
     lastTypingPingSentAt = isTyping ? Date.now() : 0;
     const body = new URLSearchParams();
     body.set("typing", isTyping ? "1" : "0");
-    fetch("/messages/" + encodeURIComponent(partner) + "/typing/", {
+    const url = groupId
+      ? "/messages/g/" + encodeURIComponent(groupId) + "/typing/"
+      : "/messages/" + encodeURIComponent(partner) + "/typing/";
+    fetch(url, {
       method: "POST",
       headers: {
         "X-CSRFToken": csrfToken,
@@ -454,7 +457,8 @@
     if (!e.target || !e.target.matches(".chat-form textarea")) return;
     const chatShell = document.querySelector("[data-chat-shell]");
     const partner = chatShell ? chatShell.dataset.chatPartner || chatShell.dataset.activePartner || "" : "";
-    if (!partner) return;
+    const groupId = chatShell ? chatShell.dataset.chatGroup || "" : "";
+    if (!partner && !groupId) return;
 
     if (typingIdleTimer) {
       window.clearTimeout(typingIdleTimer);
@@ -464,15 +468,15 @@
     if (e.target.value.trim().length > 0) {
       lastChatTypedAt = Date.now();
       if (Date.now() - lastTypingPingSentAt > 1800) {
-        sendTypingPing(partner, true);
+        sendTypingPing(partner, groupId, true);
       }
       typingIdleTimer = window.setTimeout(() => {
         lastChatTypedAt = 0;
-        sendTypingPing(partner, false);
+        sendTypingPing(partner, groupId, false);
       }, 3500);
     } else {
       lastChatTypedAt = 0;
-      sendTypingPing(partner, false);
+      sendTypingPing(partner, groupId, false);
     }
   });
 
@@ -560,8 +564,13 @@
         params.set("chat_shell", "1");
         params.set("chat_tab", chatShell.dataset.chatTab || "inbox");
         const partner = chatShell.dataset.chatPartner || chatShell.dataset.activePartner || "";
-        if (partner) {
+        const groupId = chatShell.dataset.chatGroup || "";
+        if (groupId) {
+          params.set("chat_group", groupId);
+        } else if (partner) {
           params.set("chat_partner", partner);
+        }
+        if (partner || groupId) {
           let maxMsgId = 0;
           document.querySelectorAll("#chat-log [data-msg-id]").forEach((el) => {
             const id = parseInt(el.dataset.msgId, 10);
@@ -698,12 +707,25 @@
         dot.hidden = totalUnread <= 0;
       });
 
-      // B. Update chat sidebar & active conversation
+      // B. Update chat sidebar & active conversation / group
       if (typeof data.chat_sidebar_html === "string") {
         const sidebar = document.getElementById("chat-sidebar");
-        if (sidebar && sidebar.innerHTML !== data.chat_sidebar_html) {
-          sidebar.innerHTML = data.chat_sidebar_html;
+        if (sidebar) {
+          const isEditingGroup =
+            !forceUpdate && Boolean(sidebar.querySelector("details.chat-new-group[open], input:focus"));
+          if (!isEditingGroup && sidebar.innerHTML !== data.chat_sidebar_html) {
+            sidebar.innerHTML = data.chat_sidebar_html;
+          }
         }
+      }
+
+      if (data.chat_group_removed && chatShell) {
+        if (chatDockPanel && chatDockPanel.contains(chatShell)) {
+          openChatDock("/messages/dock/");
+        } else {
+          window.location.href = "/messages/";
+        }
+        return;
       }
 
       if (data.chat && chatShell) {
@@ -712,9 +734,24 @@
           friendBadge.hidden = !data.chat.is_friends;
         }
 
+        if (typeof data.chat.member_count === "number") {
+          document.querySelectorAll("[data-group-member-count]").forEach((el) => {
+            el.textContent = data.chat.member_count + " " + pluralize(data.chat.member_count, "member", "members");
+          });
+        }
+        if (typeof data.chat.members_names === "string") {
+          document.querySelectorAll("[data-group-members-names]").forEach((el) => {
+            el.textContent = data.chat.members_names;
+          });
+        }
+
         const typingEl = document.getElementById("chat-typing-indicator");
         if (typingEl) {
           typingEl.hidden = !data.chat.partner_typing;
+          if (data.chat.typing_html) {
+            const typingTextEl = typingEl.querySelector("[data-chat-typing-text]");
+            if (typingTextEl) typingTextEl.innerHTML = data.chat.typing_html;
+          }
         }
 
         if (data.chat.new_messages_html) {
@@ -1154,7 +1191,7 @@
       return;
     }
 
-    // 2. Live Chat Request Accept / Ignore
+    // 2. Live Chat Request Accept / Ignore / Group Create / Group Invite / Group Leave
     if (form.hasAttribute("data-chat-action")) {
       e.preventDefault();
       const body = new URLSearchParams(new FormData(form));
@@ -1171,14 +1208,29 @@
           credentials: "same-origin",
         });
         const data = await resp.json();
+        if (!resp.ok || (data && data.ok === false)) {
+          if (data && (data.toast || data.error)) showToast(data.toast || data.error, "error");
+          return;
+        }
+        if (data && data.toast) {
+          showToast(data.toast, "info");
+        }
         if (data && data.redirect) {
           if (chatDockPanel && chatDockPanel.contains(form)) {
-            openChatDock(data.redirect);
+            openChatDock(data.dock_url || data.redirect);
           } else {
             window.location.href = data.redirect;
           }
           return;
         }
+        form.querySelectorAll("input[type='text']").forEach((inp) => {
+          inp.value = "";
+        });
+        form.querySelectorAll("input[type='checkbox']").forEach((cb) => {
+          cb.checked = false;
+        });
+        const parentDetails = form.closest("details");
+        if (parentDetails) parentDetails.removeAttribute("open");
         await pollLiveState(true);
       } catch (_) {
         form.submit();
