@@ -93,7 +93,7 @@ class FriendRequest(models.Model):
         ]
 
     def __str__(self):
-        return f"{self.from_user} → {self.to_user} ({self.status})"
+        return f"{self.from_user} -> {self.to_user} ({self.status})"
 
     def accept(self):
         self.status = self.Status.ACCEPTED
@@ -204,7 +204,7 @@ class DirectMessage(models.Model):
         if self.body:
             return self.body
         if self.attachment:
-            return "📷 Photo / media"
+            return "Image attachment"
         return "Message"
 
 
@@ -286,7 +286,7 @@ class GroupMessage(models.Model):
         if self.body:
             return self.body
         if self.attachment:
-            return "📷 Photo / media"
+            return "Image attachment"
         return "Message"
 
 

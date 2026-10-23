@@ -89,29 +89,29 @@
 
         <div class="mobile-nav__links">
           <a class="mobile-nav__link" href="{% url 'forum:home' %}">
-            <span>🏠 Home feed</span>
+            <span>{% icon "home" %} Home feed</span>
           </a>
           <a class="mobile-nav__link" href="{% url 'forum:community_list' %}">
-            <span>🌐 Communities</span>
+            <span>{% icon "grid" %} Communities</span>
           </a>
           {% if user.is_authenticated %}
             <a class="mobile-nav__link" href="{% url 'accounts:chat_inbox' %}">
-              <span>💬 Messages</span>
+              <span>{% icon "message" %} Messages</span>
               <span class="badge" data-live-messages-badge {% if not unread_messages_count %}hidden{% endif %}>{% if unread_messages_count %}{{ unread_messages_count }}{% endif %}</span>
             </a>
             <a class="mobile-nav__link" href="{% url 'accounts:friends' %}">
-              <span>🤝 Friends</span>
+              <span>{% icon "users" %} Friends</span>
               <span class="badge" data-live-friends-badge {% if not pending_friend_requests %}hidden{% endif %}>{% if pending_friend_requests %}{{ pending_friend_requests }}{% endif %}</span>
             </a>
             <a class="mobile-nav__link" href="{% url 'forum:submit' %}">
-              <span>✍️ Start a new thread</span>
+              <span>{% icon "plus" %} New thread</span>
             </a>
             <a class="mobile-nav__link" href="{% url 'accounts:settings_profile' %}">
-              <span>⚙️ Settings</span>
+              <span>{% icon "settings" %} Settings</span>
             </a>
             {% if user.is_staff %}
               <a class="mobile-nav__link" href="{% url 'admin:index' %}">
-                <span>🛡️ Admin panel</span>
+                <span>{% icon "shield" %} Admin panel</span>
               </a>
             {% endif %}
           {% endif %}
@@ -124,7 +124,7 @@
               <button type="submit" class="btn btn--ghost btn--block">Log out</button>
             </form>
           {% else %}
-            <a class="btn btn--primary btn--block" href="{% url 'accounts:register' %}">Create a free account</a>
+            <a class="btn btn--primary btn--block" href="{% url 'accounts:register' %}">Sign up</a>
             <a class="btn btn--ghost btn--block" href="{% url 'accounts:login' %}">Log in</a>
           {% endif %}
         </div>
@@ -146,8 +146,8 @@
 
     <footer class="footer">
       <div class="container footer__inner">
-        <span>© {% now "Y" %} {{ SITE_NAME }} · made by students, for students</span>
-        <nav><a href="{% url 'forum:guidelines' %}">Community guidelines</a> · <a href="{% url 'forum:community_list' %}">Communities</a></nav>
+        <span>© {% now "Y" %} {{ SITE_NAME }}</span>
+        <nav><a href="{% url 'forum:guidelines' %}">Guidelines</a> · <a href="{% url 'forum:community_list' %}">Communities</a></nav>
       </div>
     </footer>
   </div>
@@ -160,7 +160,7 @@
       <div class="chat-dock" id="chat-dock" data-dock-endpoint="{% url 'accounts:chat_dock' %}">
         <section class="chat-dock__panel card" id="chat-dock-panel" role="region" aria-label="Quick chat" hidden></section>
         <button type="button" class="chat-dock__launcher" id="chat-dock-launcher" data-dock-toggle aria-expanded="false" aria-controls="chat-dock-panel">
-          <span class="chat-dock__launcher-icon" aria-hidden="true">💬</span>
+          <span class="chat-dock__launcher-icon" aria-hidden="true">{% icon "message" %}</span>
           <span class="chat-dock__launcher-label">Chat</span>
           <span class="badge" data-live-messages-badge {% if not unread_messages_count %}hidden{% endif %}>{% if unread_messages_count %}{{ unread_messages_count }}{% endif %}</span>
         </button>

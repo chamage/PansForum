@@ -1,6 +1,6 @@
 {% load forum_extras %}
 <div>
-  <h3 class="mod-subtitle">👻 Ghosted users ({{ ghosts|length }})</h3>
+  <h3 class="mod-subtitle">{% icon "eye-off" "icon--sm" %} Ghosted users ({{ ghosts|length }})</h3>
   {% if ghosts %}
     <ul class="mod-user-list">
       {% for s in ghosts %}
@@ -19,7 +19,7 @@
               <input type="hidden" name="username" value="{{ s.user.username }}">
               <input type="hidden" name="kind" value="ban">
               <input type="hidden" name="reason" value="{{ s.reason }}">
-              <button type="submit" class="btn btn--ghost btn--sm" title="Upgrade to full ban">🚫 Ban</button>
+              <button type="submit" class="btn btn--ghost btn--sm" title="Upgrade to full ban">{% icon "ban" "icon--sm" %} Ban</button>
             </form>
             <form method="post" action="{% url 'forum:community_sanction_remove' community.slug s.user.username %}" class="inline" data-mod-action>
               {% csrf_token %}
@@ -35,7 +35,7 @@
 </div>
 
 <div>
-  <h3 class="mod-subtitle">🚫 Banned users ({{ bans|length }})</h3>
+  <h3 class="mod-subtitle">{% icon "ban" "icon--sm" %} Banned users ({{ bans|length }})</h3>
   {% if bans %}
     <ul class="mod-user-list">
       {% for s in bans %}
@@ -54,7 +54,7 @@
               <input type="hidden" name="username" value="{{ s.user.username }}">
               <input type="hidden" name="kind" value="ghost">
               <input type="hidden" name="reason" value="{{ s.reason }}">
-              <button type="submit" class="btn btn--ghost btn--sm" title="Switch to read-only ghost mode">👻 Ghost instead</button>
+              <button type="submit" class="btn btn--ghost btn--sm" title="Switch to read-only ghost mode">{% icon "eye-off" "icon--sm" %} Ghost instead</button>
             </form>
             <form method="post" action="{% url 'forum:community_sanction_remove' community.slug s.user.username %}" class="inline" data-mod-action>
               {% csrf_token %}

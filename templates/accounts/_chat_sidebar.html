@@ -14,7 +14,7 @@
   </div>
 
   <details class="chat-new-group" {% if tab == 'groups' and not groups %}open{% endif %}>
-    <summary class="btn btn--ghost btn--sm chat-new-group__toggle">＋ New group chat</summary>
+    <summary class="btn btn--ghost btn--sm chat-new-group__toggle">{% icon "plus" "icon--sm" %} New group chat</summary>
     <form method="post" action="{% url 'accounts:chat_group_create' %}" class="chat-new-group__form" data-chat-action>
       {% csrf_token %}
       <div class="field">
@@ -88,7 +88,7 @@
         </a>
       </li>
     {% empty %}
-      <li class="chat-list__empty muted small">You aren't in any group chats yet. Use <strong>＋ New group chat</strong> above to start one.</li>
+      <li class="chat-list__empty muted small">No group chats yet. Use <strong>New group chat</strong> above to create one.</li>
     {% endfor %}
   </ul>
 {% else %}

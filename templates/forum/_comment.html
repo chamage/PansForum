@@ -40,18 +40,18 @@
           {% if author_sanction == 'ghost' %}
             <form method="post" action="{% url 'forum:community_sanction_remove' thread.community.slug comment.author.username %}" class="inline" data-mod-action>
               {% csrf_token %}<input type="hidden" name="next" value="{{ comment.get_absolute_url }}">
-              <button type="submit" class="action">👻 Un-ghost</button>
+              <button type="submit" class="action">{% icon "eye-off" "icon--sm" %} Un-ghost</button>
             </form>
           {% else %}
             <form method="post" action="{% url 'forum:community_sanction_set' thread.community.slug %}" class="inline" data-mod-action data-confirm="Ghost @{{ comment.author.username }} in c/{{ thread.community.slug }}? They will still be able to view the community, but won't be able to post, comment, or vote.">
               {% csrf_token %}<input type="hidden" name="username" value="{{ comment.author.username }}"><input type="hidden" name="kind" value="ghost"><input type="hidden" name="next" value="{{ comment.get_absolute_url }}">
-              <button type="submit" class="action">👻 Ghost</button>
+              <button type="submit" class="action">{% icon "eye-off" "icon--sm" %} Ghost</button>
             </form>
           {% endif %}
           {% if author_sanction != 'ban' %}
             <form method="post" action="{% url 'forum:community_sanction_set' thread.community.slug %}" class="inline" data-mod-action data-confirm="Ban @{{ comment.author.username }} completely from c/{{ thread.community.slug }}?">
               {% csrf_token %}<input type="hidden" name="username" value="{{ comment.author.username }}"><input type="hidden" name="kind" value="ban"><input type="hidden" name="next" value="{{ comment.get_absolute_url }}">
-              <button type="submit" class="action action--danger">🚫 Ban</button>
+              <button type="submit" class="action action--danger">{% icon "ban" "icon--sm" %} Ban</button>
             </form>
           {% endif %}
         {% endwith %}

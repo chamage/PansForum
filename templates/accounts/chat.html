@@ -14,7 +14,7 @@
     {% if active_group %}
       <header class="chat-main__head">
         <div class="chat-main__head-left">
-          <a class="btn btn--ghost btn--sm chat-main__back" href="{% url 'accounts:chat_inbox' %}" aria-label="Back to conversations">←</a>
+          <a class="btn btn--ghost btn--sm chat-main__back" href="{% url 'accounts:chat_inbox' %}" aria-label="Back to conversations">{% icon "arrow-left" "icon--sm" %}</a>
           <div class="chat-main__partner">
             <span class="avatar avatar--md avatar--group" aria-hidden="true">{{ active_group.initial }}</span>
             <div>
@@ -28,7 +28,7 @@
         </div>
         <div class="chat-main__head-actions">
           <details class="chat-group-popover">
-            <summary class="btn btn--ghost btn--sm">👥 Members &amp; invite</summary>
+            <summary class="btn btn--ghost btn--sm">{% icon "users" "icon--sm" %} Members &amp; invite</summary>
             <div class="chat-group-popover__panel card">
               <form method="post" action="{% url 'accounts:chat_group_add_member' active_group.pk %}" class="chat-group-invite-form" data-chat-action>
                 {% csrf_token %}
@@ -72,7 +72,7 @@
           {% include "accounts/_chat_bubbles.html" %}
         {% else %}
           <div class="chat-empty muted" data-chat-empty>
-            <p>Welcome to <strong>{{ active_group.name }}</strong> 👋 Send the first message below!</p>
+            <p>No messages in <strong>{{ active_group.name }}</strong> yet.</p>
           </div>
         {% endif %}
       </div>
@@ -88,13 +88,13 @@
     {% elif active_partner %}
       <header class="chat-main__head">
         <div class="chat-main__head-left">
-          <a class="btn btn--ghost btn--sm chat-main__back" href="{% url 'accounts:chat_inbox' %}" aria-label="Back to conversations">←</a>
+          <a class="btn btn--ghost btn--sm chat-main__back" href="{% url 'accounts:chat_inbox' %}" aria-label="Back to conversations">{% icon "arrow-left" "icon--sm" %}</a>
           <a class="chat-main__partner" href="{{ active_partner.get_absolute_url }}">
             {% avatar active_partner "md" %}
             <div>
               <strong>{{ active_partner.name }}</strong>
               <span class="muted small">@{{ active_partner.username }}
-                <span id="chat-friend-badge" {% if not is_friends %}hidden{% endif %}> · <span class="tag tag--pin">✓ Friends — free DM</span></span>
+                <span id="chat-friend-badge" {% if not is_friends %}hidden{% endif %}> · <span class="tag tag--pin">{% icon "check" "icon--sm" %} Friends</span></span>
               </span>
             </div>
           </a>
@@ -111,7 +111,7 @@
           {% include "accounts/_chat_bubbles.html" %}
         {% else %}
           <div class="chat-empty muted" data-chat-empty>
-            <p>Say hi to <strong>{{ active_partner.name }}</strong> 👋</p>
+            <p>Start a conversation with <strong>{{ active_partner.name }}</strong>.</p>
           </div>
         {% endif %}
       </div>
@@ -126,9 +126,9 @@
       </footer>
     {% else %}
       <div class="chat-placeholder empty">
-        <p class="empty__emoji" aria-hidden="true">💬</p>
-        <h2>Your messages &amp; groups</h2>
-        <p class="muted">Message friends directly, start a group chat with classmates using <strong>＋ New group chat</strong> on the left, or respond to message requests.</p>
+        <div class="empty__icon" aria-hidden="true">{% icon "message" "icon--lg" %}</div>
+        <h2>Messages</h2>
+        <p class="muted">Select a conversation or group on the left, or start a new chat.</p>
       </div>
     {% endif %}
   </section>

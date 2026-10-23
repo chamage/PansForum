@@ -3,7 +3,7 @@
   {% if active_group %}
     <header class="chat-dock__head">
       <div class="chat-dock__head-left">
-        <button type="button" class="btn btn--ghost btn--sm chat-dock__back" data-dock-url="{% url 'accounts:chat_dock' %}" title="Back to conversations" aria-label="Back to conversations">←</button>
+        <button type="button" class="btn btn--ghost btn--sm chat-dock__back" data-dock-url="{% url 'accounts:chat_dock' %}" title="Back to conversations" aria-label="Back to conversations">{% icon "arrow-left" "icon--sm" %}</button>
         <div class="chat-dock__partner">
           <span class="avatar avatar--xs avatar--group" aria-hidden="true">{{ active_group.initial }}</span>
           <div class="chat-dock__partner-info">
@@ -13,8 +13,8 @@
         </div>
       </div>
       <div class="chat-dock__head-actions">
-        <a class="btn btn--ghost btn--sm" href="{% url 'accounts:chat_group' active_group.pk %}" data-dock-full title="Open full group chat" aria-label="Open full group chat">↗</a>
-        <button type="button" class="btn btn--ghost btn--sm" data-dock-close title="Minimize chat" aria-label="Minimize chat">—</button>
+        <a class="btn btn--ghost btn--sm" href="{% url 'accounts:chat_group' active_group.pk %}" data-dock-full title="Open full group chat" aria-label="Open full group chat">{% icon "external-link" "icon--sm" %}</a>
+        <button type="button" class="btn btn--ghost btn--sm" data-dock-close title="Minimize chat" aria-label="Minimize chat">{% icon "minus" "icon--sm" %}</button>
       </div>
     </header>
 
@@ -23,7 +23,7 @@
         {% include "accounts/_chat_bubbles.html" %}
       {% else %}
         <div class="chat-empty muted" data-chat-empty>
-          <p>Welcome to <strong>{{ active_group.name }}</strong> 👋</p>
+          <p>No messages in <strong>{{ active_group.name }}</strong> yet.</p>
         </div>
       {% endif %}
     </div>
@@ -39,18 +39,18 @@
   {% elif active_partner %}
     <header class="chat-dock__head">
       <div class="chat-dock__head-left">
-        <button type="button" class="btn btn--ghost btn--sm chat-dock__back" data-dock-url="{% url 'accounts:chat_dock' %}" title="Back to conversations" aria-label="Back to conversations">←</button>
+        <button type="button" class="btn btn--ghost btn--sm chat-dock__back" data-dock-url="{% url 'accounts:chat_dock' %}" title="Back to conversations" aria-label="Back to conversations">{% icon "arrow-left" "icon--sm" %}</button>
         <a class="chat-dock__partner" href="{{ active_partner.get_absolute_url }}">
           {% avatar active_partner "xs" %}
           <div class="chat-dock__partner-info">
             <strong>{{ active_partner.name }}</strong>
-            <span class="muted small">@{{ active_partner.username }}<span id="chat-friend-badge" {% if not is_friends %}hidden{% endif %}> · ✓ Friend</span></span>
+            <span class="muted small">@{{ active_partner.username }}<span id="chat-friend-badge" {% if not is_friends %}hidden{% endif %}> · Friend</span></span>
           </div>
         </a>
       </div>
       <div class="chat-dock__head-actions">
-        <a class="btn btn--ghost btn--sm" href="{% url 'accounts:chat_thread' active_partner.username %}" data-dock-full title="Open full messages page" aria-label="Open full messages page">↗</a>
-        <button type="button" class="btn btn--ghost btn--sm" data-dock-close title="Minimize chat" aria-label="Minimize chat">—</button>
+        <a class="btn btn--ghost btn--sm" href="{% url 'accounts:chat_thread' active_partner.username %}" data-dock-full title="Open full messages page" aria-label="Open full messages page">{% icon "external-link" "icon--sm" %}</a>
+        <button type="button" class="btn btn--ghost btn--sm" data-dock-close title="Minimize chat" aria-label="Minimize chat">{% icon "minus" "icon--sm" %}</button>
       </div>
     </header>
 
@@ -63,7 +63,7 @@
         {% include "accounts/_chat_bubbles.html" %}
       {% else %}
         <div class="chat-empty muted" data-chat-empty>
-          <p>Say hi to <strong>{{ active_partner.name }}</strong> 👋</p>
+          <p>Start a conversation with <strong>{{ active_partner.name }}</strong>.</p>
         </div>
       {% endif %}
     </div>
@@ -79,11 +79,11 @@
   {% else %}
     <header class="chat-dock__head">
       <div class="chat-dock__head-left">
-        <span class="chat-dock__title">💬 Quick Chat</span>
+        <span class="chat-dock__title">{% icon "message" "icon--sm" %} Quick Chat</span>
       </div>
       <div class="chat-dock__head-actions">
-        <a class="btn btn--ghost btn--sm" href="{% url 'accounts:chat_inbox' %}" data-dock-full title="Open full messages page" aria-label="Open full messages page">↗</a>
-        <button type="button" class="btn btn--ghost btn--sm" data-dock-close title="Minimize chat" aria-label="Minimize chat">—</button>
+        <a class="btn btn--ghost btn--sm" href="{% url 'accounts:chat_inbox' %}" data-dock-full title="Open full messages page" aria-label="Open full messages page">{% icon "external-link" "icon--sm" %}</a>
+        <button type="button" class="btn btn--ghost btn--sm" data-dock-close title="Minimize chat" aria-label="Minimize chat">{% icon "minus" "icon--sm" %}</button>
       </div>
     </header>
 

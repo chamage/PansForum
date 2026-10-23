@@ -1,13 +1,14 @@
 {% extends "base.html" %}
+{% load forum_extras %}
 {% block content %}
 <div class="layout">
   <section class="layout__main">
     {% if not user.is_authenticated %}
       <div class="hero card">
-        <h1>Welcome to the Agora 👋</h1>
-        <p>The student forum for PANS. Ask about that tricky assignment, share notes, find a study buddy or just talk about campus life.</p>
+        <h1>PANS Agora</h1>
+        <p>Student forum for courses, study materials, and campus discussion.</p>
         <div class="hero__actions">
-          <a class="btn btn--primary" href="{% url 'accounts:register' %}">Create a free account</a>
+          <a class="btn btn--primary" href="{% url 'accounts:register' %}">Create account</a>
           <a class="btn btn--ghost" href="{% url 'forum:community_list' %}">Browse communities</a>
         </div>
       </div>
@@ -30,10 +31,10 @@
         {% include "forum/_thread_card.html" %}
       {% empty %}
         <div class="empty card" data-feed-empty>
-          <p class="empty__emoji" aria-hidden="true">🌱</p>
-          <h2>It's quiet here… for now.</h2>
-          <p class="muted">Be the first to start a conversation.</p>
-          <a class="btn btn--primary" href="{% url 'forum:submit' %}">Start a thread</a>
+          <div class="empty__icon" aria-hidden="true">{% icon "message" "icon--lg" %}</div>
+          <h2>No threads yet</h2>
+          <p class="muted">Start the first discussion in a community.</p>
+          <a class="btn btn--primary" href="{% url 'forum:submit' %}">New thread</a>
         </div>
       {% endfor %}
     </div>
@@ -44,13 +45,13 @@
   <aside class="layout__side">
     {% if user.is_authenticated and not has_joined %}
       <div class="card side-card side-card--accent">
-        <h3>Personalise your feed</h3>
-        <p>Join communities for your courses and interests — their threads will show up here.</p>
-        <a class="btn btn--primary btn--block" href="{% url 'forum:community_list' %}">Find communities</a>
+        <h3>Your feed</h3>
+        <p>Join communities for your courses to filter this feed.</p>
+        <a class="btn btn--primary btn--block" href="{% url 'forum:community_list' %}">Browse communities</a>
       </div>
     {% endif %}
     <div class="card side-card">
-      <h3>Popular communities</h3>
+      <h3>Communities</h3>
       <ul class="community-mini" id="popular-communities-list">
         {% for community in popular %}
           <li>
@@ -61,11 +62,11 @@
           <li class="muted">No communities yet.</li>
         {% endfor %}
       </ul>
-      <a class="side-card__more" href="{% url 'forum:community_list' %}">See all →</a>
+      <a class="side-card__more" href="{% url 'forum:community_list' %}">All communities {% icon "arrow-right" "icon--sm" %}</a>
     </div>
     <div class="card side-card">
-      <h3>Be kind ✌️</h3>
-      <p class="muted small">Help each other learn. Don't share exam answers or other people's personal info. <a href="{% url 'forum:guidelines' %}">Read the guidelines</a>.</p>
+      <h3>Forum rules</h3>
+      <p class="muted small">Keep discussions constructive. Do not post exam answers or private personal information. <a href="{% url 'forum:guidelines' %}">Read guidelines</a>.</p>
     </div>
   </aside>
 </div>

@@ -30,7 +30,7 @@ COMMENT_SORTS = {
     "new": ("-created_at",),
     "old": ("created_at",),
 }
-THREAD_SORT_OPTIONS = [("hot", "🔥 Hot"), ("new", "✨ New"), ("top", "⬆ Top")]
+THREAD_SORT_OPTIONS = [("hot", "Hot"), ("new", "New"), ("top", "Top")]
 COMMENT_SORT_OPTIONS = [("best", "Best"), ("new", "Newest"), ("old", "Oldest")]
 
 

@@ -1,10 +1,10 @@
-<div class="drawer__bar">
+{% load forum_extras %}<div class="drawer__bar">
   <div class="drawer__bar-left">
-    <button type="button" class="btn btn--ghost btn--sm" data-drawer-close aria-label="Close quick view">✕ Close <span class="drawer__kbd">Esc</span></button>
+    <button type="button" class="btn btn--ghost btn--sm" data-drawer-close aria-label="Close quick view">{% icon "x" "icon--sm" %} Close <span class="drawer__kbd">Esc</span></button>
     <a class="chip" href="{{ community.get_absolute_url }}">c/{{ community.slug }}</a>
   </div>
   <div class="drawer__bar-right">
-    <a class="btn btn--primary btn--sm" href="{{ thread.get_absolute_url }}">Open full thread ↗</a>
+    <a class="btn btn--primary btn--sm" href="{{ thread.get_absolute_url }}">Open full thread {% icon "external-link" "icon--sm" %}</a>
   </div>
 </div>
 

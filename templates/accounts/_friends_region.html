@@ -36,7 +36,7 @@
     {% include "accounts/_user_card.html" with person=friend %}
   {% empty %}
     <div class="empty card">
-      <p class="empty__emoji" aria-hidden="true">🤝</p>
+      <div class="empty__icon" aria-hidden="true">{% icon "users" "icon--lg" %}</div>
       <h2>No friends yet</h2>
       <p class="muted">Use the search bar to find people from your courses.</p>
     </div>

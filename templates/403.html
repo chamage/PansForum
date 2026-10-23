@@ -1,11 +1,12 @@
 {% extends "base.html" %}
+{% load forum_extras %}
 {% block title %}Access denied · {{ SITE_NAME }}{% endblock %}
 {% block content %}
 <div class="auth">
   <div class="card auth__card empty">
-    <p class="empty__emoji" aria-hidden="true">🔒</p>
+    <div class="empty__icon" aria-hidden="true">{% icon "lock" "icon--lg" %}</div>
     <h1>Access denied</h1>
-    <p class="muted">You don't have permission to do that.</p>
+    <p class="muted">You don't have permission to access this page.</p>
     <a class="btn btn--primary" href="{% url 'forum:home' %}">Back to home</a>
   </div>
 </div>

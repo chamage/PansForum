@@ -76,8 +76,8 @@
 
     if (!chatDockPanel.innerHTML.trim()) {
       chatDockPanel.innerHTML =
-        '<div class="chat-dock__inner"><header class="chat-dock__head"><span class="chat-dock__title">💬 Quick Chat</span>' +
-        '<button type="button" class="btn btn--ghost btn--sm" data-dock-close aria-label="Minimize chat">—</button></header>' +
+        '<div class="chat-dock__inner"><header class="chat-dock__head"><span class="chat-dock__title"><svg class="icon icon--sm" viewBox="0 0 24 24" aria-hidden="true"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg> Quick Chat</span>' +
+        '<button type="button" class="btn btn--ghost btn--sm" data-dock-close aria-label="Minimize chat"><svg class="icon icon--sm" viewBox="0 0 24 24" aria-hidden="true"><line x1="5" x2="19" y1="12" y2="12"/></svg></button></header>' +
         '<div class="chat-dock__body"><div class="chat-list__empty muted small">Loading chat…</div></div></div>';
     }
 
@@ -160,10 +160,10 @@
     drawer.innerHTML =
       '<div class="drawer__bar">' +
       '  <div class="drawer__bar-left">' +
-      '    <button type="button" class="btn btn--ghost btn--sm" data-drawer-close>✕ Close <span class="drawer__kbd">Esc</span></button>' +
+      '    <button type="button" class="btn btn--ghost btn--sm" data-drawer-close><svg class="icon icon--sm" viewBox="0 0 24 24" aria-hidden="true"><line x1="18" x2="6" y1="6" y2="18"/><line x1="6" x2="18" y1="6" y2="18"/></svg> Close <span class="drawer__kbd">Esc</span></button>' +
       "  </div>" +
       '  <div class="drawer__bar-right">' +
-      '    <a class="btn btn--primary btn--sm" href="' + encodeURI(url) + '">Open full thread ↗</a>' +
+      '    <a class="btn btn--primary btn--sm" href="' + encodeURI(url) + '">Open full thread <svg class="icon icon--sm" viewBox="0 0 24 24" aria-hidden="true"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><polyline points="15 3 21 3 21 9"/><line x1="10" x2="21" y1="14" y2="3"/></svg></a>' +
       "  </div>" +
       "</div>" +
       '<div class="drawer__scroll"><div class="card drawer__loading">Loading thread…</div></div>';
@@ -1028,9 +1028,9 @@
         if (boxSlot && boxSlot.dataset.boxState && boxSlot.dataset.boxState !== tm.box_state) {
           boxSlot.dataset.boxState = tm.box_state;
           if (tm.box_state === "ghost") {
-            boxSlot.innerHTML = `<div class="alert alert--info">👻 You are in read-only mode in <strong>c/${tm.community_slug}</strong>. You can read posts and comments, but cannot reply or vote.</div>`;
+            boxSlot.innerHTML = `<div class="alert alert--info"><svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94"/><path d="M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19"/><path d="m14.12 14.12a3 3 0 1 1-4.24-4.24"/><line x1="1" x2="23" y1="1" y2="23"/></svg> You are in read-only mode in <strong>c/${tm.community_slug}</strong>. You can read posts and comments, but cannot reply or vote.</div>`;
           } else if (tm.box_state === "locked") {
-            boxSlot.innerHTML = `<div class="alert alert--info">🔒 This thread is locked. You can read it, but new comments are turned off.</div>`;
+            boxSlot.innerHTML = `<div class="alert alert--info"><svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><rect width="18" height="11" x="3" y="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg> This thread is locked. New comments are turned off.</div>`;
           } else if (drawer && !drawer.hidden && activeDrawerUrl) {
             openQuickView(activeDrawerUrl, lastTriggerEl);
           } else {

@@ -3,8 +3,8 @@
 {% block content %}
 <div class="auth">
   <div class="card auth__card">
-    <h1>Welcome back</h1>
-    <p class="muted">Log in to join the discussion.</p>
+    <h1>Log in</h1>
+    <p class="muted">Sign in to your account.</p>
     <form method="post" novalidate>
       {% csrf_token %}
       <input type="hidden" name="next" value="{{ next }}">

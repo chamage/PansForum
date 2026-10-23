@@ -7,7 +7,7 @@
   </a>
   {% if user.is_authenticated and user.pk != person.pk %}
     <div class="user-card__actions">
-      <a class="btn btn--ghost btn--sm" href="{% url 'accounts:chat_thread' person.username %}">💬 Message</a>
+      <a class="btn btn--ghost btn--sm" href="{% url 'accounts:chat_thread' person.username %}">{% icon "message" "icon--sm" %} Message</a>
     </div>
   {% endif %}
 </article>

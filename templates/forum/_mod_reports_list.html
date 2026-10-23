@@ -1,7 +1,7 @@
 {% load forum_extras %}
 <div class="mod-section__head">
-  <h2>🚩 Open reports ({{ reports|length }})</h2>
-  <p class="muted small">Posts and comments flagged by students in <code>c/{{ community.slug }}</code>.</p>
+  <h2>{% icon "flag" %} Open reports ({{ reports|length }})</h2>
+  <p class="muted small">Posts and comments flagged in <code>c/{{ community.slug }}</code>.</p>
 </div>
 
 {% if reports %}
@@ -43,5 +43,5 @@
     {% endfor %}
   </ul>
 {% else %}
-  <p class="muted small">🎉 All clear — no open reports in this community.</p>
+  <p class="muted small">No open reports in this community.</p>
 {% endif %}

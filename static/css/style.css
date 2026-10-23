@@ -1181,9 +1181,39 @@ p:last-child { margin-bottom: 0; }
   line-height: 1;
 }
 
+.icon {
+  display: inline-block;
+  width: 1.05em;
+  height: 1.05em;
+  vertical-align: -0.16em;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 2;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  flex-shrink: 0;
+}
+.icon--sm {
+  width: 0.9em;
+  height: 0.9em;
+  vertical-align: -0.12em;
+}
+.icon--lg {
+  width: 2.25rem;
+  height: 2.25rem;
+  stroke-width: 1.75;
+}
+
 .empty {
   text-align: center;
   padding: 2.4rem 1.5rem;
+}
+.empty__icon {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  margin-bottom: 0.5rem;
+  color: var(--text-muted);
 }
 .empty__emoji { font-size: 2rem; margin-bottom: 0.3rem; }
 

@@ -13,7 +13,7 @@
     <span data-join-slot="{{ community.slug }}">{% if not is_ghosted %}{% include "forum/_join_button.html" %}{% endif %}</span>
     {% if is_mod %}
       <a class="btn btn--ghost btn--sm" href="{% url 'forum:community_manage' community.slug %}">
-        🛡 Manage community <span class="badge" data-community-reports-badge {% if not open_reports_count %}hidden{% endif %}>{% if open_reports_count %}{{ open_reports_count }}{% endif %}</span>
+        {% icon "shield" "icon--sm" %} Manage community <span class="badge" data-community-reports-badge {% if not open_reports_count %}hidden{% endif %}>{% if open_reports_count %}{{ open_reports_count }}{% endif %}</span>
       </a>
     {% endif %}
   </div>
@@ -24,7 +24,7 @@
     <div class="feed-head" id="community-composer-slot" data-ghost-state="{% if is_ghosted %}1{% else %}0{% endif %}">
       {% if is_ghosted %}
         <div class="alert alert--info">
-          👻 You are in read-only mode in <strong>c/{{ community.slug }}</strong>. You can view posts and comments, but cannot post, reply, or vote.
+          {% icon "eye-off" %} You are in read-only mode in <strong>c/{{ community.slug }}</strong>. You can view posts and comments, but cannot post, reply, or vote.
         </div>
       {% else %}
         <a class="composer card" href="{% url 'forum:community_submit' community.slug %}">
@@ -40,9 +40,9 @@
         {% include "forum/_thread_card.html" with show_pins=True %}
       {% empty %}
         <div class="empty card" data-feed-empty>
-          <p class="empty__emoji" aria-hidden="true">💬</p>
+          <div class="empty__icon" aria-hidden="true">{% icon "message" "icon--lg" %}</div>
           <h2>No threads yet</h2>
-          <p class="muted">Kick things off with a question or an introduction.</p>
+          <p class="muted">No posts in this community yet.</p>
           <a class="btn btn--primary" href="{% url 'forum:community_submit' community.slug %}">Start a thread</a>
         </div>
       {% endfor %}
@@ -68,7 +68,7 @@
           {% endfor %}
         </ul>
         {% if is_mod %}
-          <a class="side-card__more" href="{% url 'forum:community_manage' community.slug %}">Manage community →</a>
+          <a class="side-card__more" href="{% url 'forum:community_manage' community.slug %}">Manage community {% icon "arrow-right" "icon--sm" %}</a>
         {% endif %}
       </div>
     {% endif %}

@@ -5,7 +5,7 @@
 {% block content %}
 <div class="layout">
   <section class="layout__main">
-    <a class="backlink" href="{{ community.get_absolute_url }}">← c/{{ community.slug }}</a>
+    <a class="backlink" href="{{ community.get_absolute_url }}">{% icon "arrow-left" "icon--sm" %} c/{{ community.slug }}</a>
     {% include "forum/_thread_content.html" %}
   </section>
 

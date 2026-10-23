@@ -1,11 +1,12 @@
 {% extends "base.html" %}
-{% block title %}Slow down · {{ SITE_NAME }}{% endblock %}
+{% load forum_extras %}
+{% block title %}Too many requests · {{ SITE_NAME }}{% endblock %}
 {% block content %}
 <div class="auth">
   <div class="card auth__card empty">
-    <p class="empty__emoji" aria-hidden="true">⏳</p>
-    <h1>Take a breather</h1>
-    <p class="muted">You're doing that a bit too fast. Please wait a moment and try again.</p>
+    <div class="empty__icon" aria-hidden="true">{% icon "clock" "icon--lg" %}</div>
+    <h1>Too many requests</h1>
+    <p class="muted">Please wait a moment and try again.</p>
     <a class="btn btn--primary" href="{% url 'forum:home' %}">Back to home</a>
   </div>
 </div>

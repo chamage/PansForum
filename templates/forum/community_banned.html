@@ -1,9 +1,10 @@
 {% extends "base.html" %}
+{% load forum_extras %}
 {% block title %}Banned from c/{{ community.slug }} · {{ SITE_NAME }}{% endblock %}
 {% block content %}
 <div class="narrow">
   <div class="card empty">
-    <p class="empty__emoji" aria-hidden="true">🚫</p>
+    <div class="empty__icon" aria-hidden="true">{% icon "ban" "icon--lg" %}</div>
     <h1>You are banned from c/{{ community.slug }}</h1>
     <p class="muted">The moderators of <strong>{{ community.name }}</strong> have restricted your access to this community.</p>
     {% if sanction and sanction.reason %}

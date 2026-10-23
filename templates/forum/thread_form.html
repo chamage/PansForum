@@ -3,12 +3,11 @@
 {% block content %}
 <div class="narrow">
   <div class="card form-card">
-    <h1>Start a thread{% if community %} in <a href="{{ community.get_absolute_url }}">c/{{ community.slug }}</a>{% endif %}</h1>
-    <p class="muted">Tip: a specific title gets better answers. “Why does my recursion overflow in Python?” beats “Help pls”.</p>
+    <h1>New thread{% if community %} in <a href="{{ community.get_absolute_url }}">c/{{ community.slug }}</a>{% endif %}</h1>
     <form method="post" novalidate>
       {% csrf_token %}
       {% include "components/form.html" %}
-      <p class="help">Plain text. Links are clickable. Please follow the <a href="{% url 'forum:guidelines' %}">community guidelines</a>.</p>
+      <p class="help">Plain text. URLs are linked automatically. See the <a href="{% url 'forum:guidelines' %}">guidelines</a>.</p>
       <div class="form-actions">
         <a class="btn btn--ghost" href="{% if community %}{{ community.get_absolute_url }}{% else %}{% url 'forum:home' %}{% endif %}">Cancel</a>
         <button class="btn btn--primary" type="submit">Post thread</button>

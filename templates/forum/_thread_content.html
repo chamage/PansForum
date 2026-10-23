@@ -36,18 +36,18 @@
               {% if author_sanction == 'ghost' %}
                 <form method="post" action="{% url 'forum:community_sanction_remove' community.slug thread.author.username %}" class="inline" data-mod-action>
                   {% csrf_token %}<input type="hidden" name="next" value="{{ thread.get_absolute_url }}">
-                  <button type="submit" class="action" title="Restore interaction permissions">👻 Un-ghost @{{ thread.author.username }}</button>
+                  <button type="submit" class="action" title="Restore interaction permissions">{% icon "eye-off" "icon--sm" %} Un-ghost @{{ thread.author.username }}</button>
                 </form>
               {% else %}
                 <form method="post" action="{% url 'forum:community_sanction_set' community.slug %}" class="inline" data-mod-action data-confirm="Ghost @{{ thread.author.username }} in c/{{ community.slug }}? They will still be able to view the community, but won't be able to post, comment, or vote.">
                   {% csrf_token %}<input type="hidden" name="username" value="{{ thread.author.username }}"><input type="hidden" name="kind" value="ghost"><input type="hidden" name="next" value="{{ thread.get_absolute_url }}">
-                  <button type="submit" class="action" title="Allow viewing only (cannot post, comment, or vote)">👻 Ghost user</button>
+                  <button type="submit" class="action" title="Allow viewing only (cannot post, comment, or vote)">{% icon "eye-off" "icon--sm" %} Ghost user</button>
                 </form>
               {% endif %}
               {% if author_sanction != 'ban' %}
                 <form method="post" action="{% url 'forum:community_sanction_set' community.slug %}" class="inline" data-mod-action data-confirm="Ban @{{ thread.author.username }} completely from c/{{ community.slug }}? They will not be able to enter or view this community.">
                   {% csrf_token %}<input type="hidden" name="username" value="{{ thread.author.username }}"><input type="hidden" name="kind" value="ban"><input type="hidden" name="next" value="{{ thread.get_absolute_url }}">
-                  <button type="submit" class="action action--danger" title="Block user from entering c/{{ community.slug }}">🚫 Ban user</button>
+                  <button type="submit" class="action action--danger" title="Block user from entering c/{{ community.slug }}">{% icon "ban" "icon--sm" %} Ban user</button>
                 </form>
               {% endif %}
             {% endwith %}
@@ -64,9 +64,9 @@
 <section id="comments" class="card discussion">
   <div id="thread-comment-box-slot" data-box-state="{% if is_ghosted %}ghost{% elif thread.is_locked %}locked{% else %}open{% endif %}">
     {% if is_ghosted %}
-      <div class="alert alert--info">👻 You are in read-only mode in <strong>c/{{ community.slug }}</strong>. You can read posts and comments, but cannot reply or vote.</div>
+      <div class="alert alert--info">{% icon "eye-off" %} You are in read-only mode in <strong>c/{{ community.slug }}</strong>. You can read posts and comments, but cannot reply or vote.</div>
     {% elif thread.is_locked %}
-      <div class="alert alert--info">🔒 This thread is locked. You can read it, but new comments are turned off.</div>
+      <div class="alert alert--info">{% icon "lock" %} This thread is locked. New comments are turned off.</div>
     {% elif user.is_authenticated %}
       <form method="post" action="{% url 'forum:comment_create' thread.pk %}" class="comment-form" data-live-comment-form="{{ thread.pk }}">
         {% csrf_token %}

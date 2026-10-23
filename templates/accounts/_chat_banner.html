@@ -1,7 +1,7 @@
-{% if is_incoming_request and conversation %}
+{% load forum_extras %}{% if is_incoming_request and conversation %}
   <div class="chat-banner chat-banner--request">
     <div>
-      <strong>👋 Message request from {{ active_partner.name }}</strong>
+      <strong>{% icon "mail" "icon--sm" %} Message request from {{ active_partner.name }}</strong>
       <p class="small muted">You aren't friends with @{{ active_partner.username }} yet. Reply below or click <b>Accept</b> to chat freely, or <b>Ignore</b> to dismiss this request.</p>
     </div>
     <div class="chat-banner__actions">
@@ -22,6 +22,6 @@
   </div>
 {% elif not is_friends and not conversation %}
   <div class="chat-banner chat-banner--muted">
-    <span>ℹ️ You and <strong>{{ active_partner.name }}</strong> aren't friends yet. You can send an initial message request — once they respond or accept, you can chat freely.</span>
+    <span>{% icon "info" "icon--sm" %} You and <strong>{{ active_partner.name }}</strong> aren't friends yet. You can send an initial message request — once they respond or accept, you can chat freely.</span>
   </div>
 {% endif %}

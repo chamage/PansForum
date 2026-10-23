@@ -16,7 +16,7 @@
         <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 5h16v11H8l-4 4z"/></svg>
         <span data-thread-comment-count="{{ thread.pk }}">{{ thread.comment_count }} comment{{ thread.comment_count|pluralize }}</span>
       </a>
-      <a class="pill pill--subtle" href="{{ thread.get_absolute_url }}" title="Open directly as full page">Full page ↗</a>
+      <a class="pill pill--subtle" href="{{ thread.get_absolute_url }}" title="Open directly as full page">Full page {% icon "external-link" "icon--sm" %}</a>
     </div>
   </div>
 </article>

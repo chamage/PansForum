@@ -1,4 +1,4 @@
-{% if can_send %}
+{% load forum_extras %}{% if can_send %}
   <form method="post" action="{% if active_group %}{% url 'accounts:chat_group' active_group.pk %}{% else %}{% url 'accounts:chat_thread' active_partner.username %}{% endif %}" enctype="multipart/form-data" class="chat-form-wrap" data-chat-send-form>
     {% csrf_token %}
 
@@ -6,15 +6,15 @@
       <div class="chat-attachment-bar" id="chat-attachment-bar" hidden>
         <img id="chat-attachment-thumb" class="chat-attachment-bar__thumb" src="" alt="Preview">
         <span id="chat-attachment-name" class="small muted"></span>
-        <button type="button" class="btn btn--ghost btn--sm" data-clear-chat-media aria-label="Remove attachment">✕ Remove</button>
+        <button type="button" class="btn btn--ghost btn--sm" data-clear-chat-media aria-label="Remove attachment">{% icon "x" "icon--sm" %} Remove</button>
       </div>
     {% endif %}
 
     <div class="chat-form">
       {% if is_friends or is_group_chat %}
         <div class="chat-tools">
-          <label class="btn btn--ghost btn--sm chat-tool-btn" for="id_chat_attachment" title="Send photo or GIF file (max 4 MB)">
-            📷 <span class="sr-only">Attach media</span>
+          <label class="btn btn--ghost btn--sm chat-tool-btn" for="id_chat_attachment" title="Attach image or GIF (max 4 MB)">
+            {% icon "image" %} <span class="sr-only">Attach media</span>
           </label>
           <input type="file" name="attachment" id="id_chat_attachment" accept="image/png,image/jpeg,image/webp,image/gif" class="sr-only" data-chat-media-input>
         </div>
@@ -27,6 +27,6 @@
   </form>
 {% elif waiting_for_response %}
   <div class="chat-locked muted small">
-    ⏳ Message request sent to <strong>{{ active_partner.name }}</strong>. You'll be able to send more messages once they respond or accept your request.
+    {% icon "clock" "icon--sm" %} Message request sent to <strong>{{ active_partner.name }}</strong>. You'll be able to send more messages once they respond or accept your request.
   </div>
 {% endif %}

@@ -4,7 +4,7 @@
 {% block content %}
 <div class="layout" id="community-manage-shell" data-manage-community="{{ community.slug }}">
   <section class="layout__main">
-    <a class="backlink" href="{{ community.get_absolute_url }}">← Back to c/{{ community.slug }}</a>
+    <a class="backlink" href="{{ community.get_absolute_url }}">{% icon "arrow-left" "icon--sm" %} Back to c/{{ community.slug }}</a>
 
     <header class="card community-hero">
       <span class="community-dot community-dot--xl" aria-hidden="true">{{ community.name|first|upper }}</span>
@@ -20,10 +20,10 @@
     <!-- 1. Ban & Ghost Users -->
     <section class="card mod-section" id="mod-sanctions">
       <div class="mod-section__head">
-        <h2>🚫 Ban &amp; 👻 Ghost users</h2>
+        <h2>{% icon "ban" %} User restrictions</h2>
         <p class="muted small">
-          <strong>Ghost:</strong> User can still enter and read <code>c/{{ community.slug }}</code>, but cannot post threads, comment, or vote.<br>
-          <strong>Ban:</strong> User is completely blocked from entering or viewing <code>c/{{ community.slug }}</code> and its threads.
+          <strong>Ghost:</strong> User can view <code>c/{{ community.slug }}</code>, but cannot post threads, comment, or vote.<br>
+          <strong>Ban:</strong> User is blocked from entering or viewing <code>c/{{ community.slug }}</code> and its threads.
         </p>
       </div>
 
@@ -37,8 +37,8 @@
           <div class="field">
             <label for="sanction-kind">Restriction</label>
             <select id="sanction-kind" name="kind">
-              <option value="ghost">👻 Ghost (can view, cannot interact)</option>
-              <option value="ban">🚫 Ban completely (cannot enter community)</option>
+              <option value="ghost">Ghost (read-only)</option>
+              <option value="ban">Ban completely (no access)</option>
             </select>
           </div>
           <div class="field mod-inline-form__grow">
@@ -64,7 +64,7 @@
     <!-- 3. Community Details -->
     <section class="card mod-section" id="mod-details">
       <div class="mod-section__head">
-        <h2>✏️ Community settings</h2>
+        <h2>{% icon "settings" %} Community settings</h2>
       </div>
       <form method="post" novalidate>
         {% csrf_token %}
@@ -79,7 +79,7 @@
   <!-- Sidebar: Moderator Team Management -->
   <aside class="layout__side">
     <div class="card side-card" id="mod-team">
-      <h3>🛡 Moderator team</h3>
+      <h3>{% icon "shield" "icon--sm" %} Moderator team</h3>
       <p class="muted small">Moderators can pin, lock, or delete posts &amp; comments, and ghost or ban users in <code>c/{{ community.slug }}</code>.</p>
 
       <ul class="mod-user-list mod-user-list--compact" id="mod-team-region">
