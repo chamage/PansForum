@@ -275,6 +275,24 @@
   });
 
   // --------------------------------------------------------------------------
+  // Dark / Light Theme Toggle & Persistence
+  // --------------------------------------------------------------------------
+  function getEffectiveTheme() {
+    const current = document.documentElement.getAttribute("data-theme");
+    if (current === "dark" || current === "light") return current;
+    return window.matchMedia && window.matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light";
+  }
+
+  function toggleTheme() {
+    const current = getEffectiveTheme();
+    const next = current === "dark" ? "light" : "dark";
+    document.documentElement.setAttribute("data-theme", next);
+    try {
+      localStorage.setItem("pans_theme", next);
+    } catch (_) {}
+  }
+
+  // --------------------------------------------------------------------------
   // Global Click Handler (Toasts, Dropdowns, Quick-View, Chat GIFs)
   // --------------------------------------------------------------------------
   document.addEventListener("click", (e) => {
@@ -283,6 +301,13 @@
     if (closeBtn) {
       const toast = closeBtn.closest(".toast");
       if (toast) toast.remove();
+      return;
+    }
+
+    // 1c. Theme toggle (light/dark)
+    if (e.target.closest("[data-theme-toggle]")) {
+      e.preventDefault();
+      toggleTheme();
       return;
     }
 
